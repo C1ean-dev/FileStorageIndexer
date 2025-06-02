@@ -32,11 +32,15 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller --onedir --noconsole --name "pesquisa" file_indexer.py
 
+      - name: Archive build output
+        run: |
+          Compress-Archive -Path dist/pesquisa -DestinationPath dist/pesquisa-v${{ github.run_number }}.zip
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Release ${{ github.run_number }}"
           tag_name: "v${{ github.run_number }}"
-          files: dist/pesquisa
+          files: dist/pesquisa-v${{ github.run_number }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
