@@ -30,17 +30,19 @@ jobs:
         run: echo "__version__ = 'v${{ github.run_number }}'" > version.py
 
       - name: Build with PyInstaller
-        run: pyinstaller --onedir --noconsole --name "pesquisa" file_indexer.py
+        run: pyinstaller --onefile --noconsole --name "pesquisa" file_indexer.py
+        #run: pyinstaller --onedir --noconsole --name "pesquisa" file_indexer.py
 
-      - name: Archive build output
-        run: |
-          Compress-Archive -Path dist/pesquisa -DestinationPath dist/pesquisa-v${{ github.run_number }}.zip
+      #- name: Archive build output
+      #  run: |
+      #    Compress-Archive -Path dist/pesquisa -DestinationPath dist/pesquisa-v${{ github.run_number }}.zip
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Release ${{ github.run_number }}"
           tag_name: "v${{ github.run_number }}"
-          files: dist/pesquisa-v${{ github.run_number }}.zip
+        # files: dist/pesquisa-v${{ github.run_number }}.zip
+          files: dist/pesquisa.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
