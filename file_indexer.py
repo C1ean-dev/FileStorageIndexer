@@ -21,10 +21,9 @@ class FileIndexer:
         """
         self.db_path = db_path
         self.max_workers = max_workers
-        self.conn = None
-        self.db_lock = threading.Lock()  # Lock para operações thread-safe no banco
+        self.thread_local_db = threading.local() # Armazena a conexão do DB por thread
         self.setup_logging()
-        self.setup_database()
+        self.setup_database_schema() # Apenas configura o esquema, não a conexão
     
     def setup_logging(self):
         """Configura o sistema de logging"""
@@ -38,39 +37,47 @@ class FileIndexer:
         )
         self.logger = logging.getLogger(__name__)
     
-    def setup_database(self):
-        """Cria e configura o banco de dados SQLite"""
-        try:
-            self.conn = sqlite3.connect(self.db_path)
-            cursor = self.conn.cursor()
+    def get_db_connection(self):
+        """Retorna uma conexão SQLite thread-local."""
+        if not hasattr(self.thread_local_db, "conn"):
+            self.thread_local_db.conn = sqlite3.connect(self.db_path)
+            self.thread_local_db.conn.execute('PRAGMA journal_mode = WAL;')
+            self.thread_local_db.conn.execute('PRAGMA synchronous = OFF;')
+        return self.thread_local_db.conn
+
+    def setup_database_schema(self):
+        """Cria e configura o esquema do banco de dados SQLite (tabelas e índices)."""
+        conn = sqlite3.connect(self.db_path) # Conexão temporária para setup
+        cursor = conn.cursor()
+        
+        # Otimizações SQLite
+        cursor.execute('PRAGMA journal_mode = WAL;')
+        cursor.execute('PRAGMA synchronous = OFF;')
+        
+        # Criar tabela para armazenar informações dos arquivos
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS files (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                filename TEXT NOT NULL,
+                full_path TEXT NOT NULL UNIQUE,
+                parent_path TEXT,
+                file_size INTEGER,
+                modified_date TEXT,
+                item_type TEXT NOT NULL, -- 'file' or 'folder'
+                indexed_date TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Criar índices para busca rápida
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_filename ON files(filename)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_full_path ON files(full_path)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_item_type ON files(item_type)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_parent_path ON files(parent_path)')
+        
+        conn.commit()
+        conn.close() # Fechar a conexão temporária
+        self.logger.info(f"Esquema do banco de dados configurado: {self.db_path}")
             
-            # Otimizações SQLite
-            cursor.execute('PRAGMA journal_mode = WAL;')
-            cursor.execute('PRAGMA synchronous = OFF;')
-            
-            # Criar tabela para armazenar informações dos arquivos
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS files (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    filename TEXT NOT NULL,
-                    full_path TEXT NOT NULL UNIQUE,
-                    file_size INTEGER,
-                    modified_date TEXT,
-                    indexed_date TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # Criar índices para busca rápida
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_filename ON files(filename)')
-            cursor.execute('CREATE INDEX IF NOT EXISTS idx_full_path ON files(full_path)')
-            
-            self.conn.commit()
-            self.logger.info(f"Banco de dados configurado: {self.db_path}")
-            
-        except sqlite3.Error as e:
-            self.logger.error(f"Erro ao configurar banco de dados: {e}")
-            raise
-    
     def scan_network_folder(self, network_path: str, update_existing: bool = False):
         """
         Escaneia recursivamente uma pasta de rede e indexa todos os arquivos usando streaming
@@ -282,30 +289,151 @@ class FileIndexer:
         if processed_files > 0:
             self.logger.info(f"Taxa de sucesso: {(processed_files/(processed_files+errors))*100:.1f}%")
     
-    def insert_batch_records(self, batch_data: List[Tuple]):
+    def scan_network_folders(self, network_path: str):
         """
-        Insere um lote de registros no banco de dados de forma thread-safe
+        Escaneia recursivamente uma pasta de rede e indexa apenas as pastas usando streaming.
         
         Args:
-            batch_data: Lista de tuplas com dados dos arquivos
+            network_path: Caminho da pasta de rede (ex: \\192.168.7.209\bna)
         """
-        with self.db_lock:
-            cursor = self.conn.cursor()
+        self.logger.info(f"Iniciando escaneamento de pastas em modo streaming: {network_path}")
+
+        if not os.path.exists(network_path):
+            self.logger.error(f"Caminho não encontrado: {network_path}")
+            return
+
+        processed_folders = 0
+        errors = 0
+        
+        folder_queue = Queue(maxsize=1000)
+
+        def folder_collector():
+            folders_found_in_collector = 0
             try:
-                cursor.executemany('''
-                    INSERT OR REPLACE INTO files 
-                    (filename, full_path, file_size, modified_date)
-                    VALUES (?, ?, ?, ?)
-                ''', batch_data)
-                self.conn.commit()
-            except sqlite3.Error as e:
-                self.logger.error(f"Erro ao inserir lote de registros: {e}")
-                raise
+                for root, dirs, files in os.walk(network_path):
+                    for d in dirs:
+                        full_path = os.path.join(root, d)
+                        folder_queue.put((d, full_path))
+                        folders_found_in_collector += 1
+                        if folders_found_in_collector % 1000 == 0:
+                            self.logger.info(f"Coletadas {folders_found_in_collector} pastas na fila...")
+            except Exception as e:
+                self.logger.error(f"Erro durante coleta de pastas: {e}")
+            finally:
+                for _ in range(self.max_workers):
+                    folder_queue.put(None)
+                self.logger.info(f"Coleta de pastas finalizada. Total de pastas encontradas pelo coletor: {folders_found_in_collector}")
+
+        collector_thread = threading.Thread(target=folder_collector, daemon=True)
+        collector_thread.start()
+
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            futures = []
+            with tqdm(desc="Processando pastas", unit="pasta", dynamic_ncols=True, miniters=1) as pbar:
+                while True:
+                    item = folder_queue.get()
+                    if item is None:
+                        folder_queue.task_done()
+                        break
+                    
+                    folder_name, full_path = item
+                    futures.append(executor.submit(self._process_single_folder, folder_name, full_path))
+                    folder_queue.task_done()
+                
+                for future in as_completed(futures):
+                    try:
+                        result = future.result()
+                        if result:
+                            processed_folders += 1
+                        else:
+                            errors += 1
+                    except Exception as e:
+                        errors += 1
+                        self.logger.error(f"Erro inesperado ao processar pasta: {e}")
+                    pbar.update(1)
+        
+        collector_thread.join()
+
+        self.logger.info(f"Escaneamento de pastas concluído!")
+        self.logger.info(f"Pastas processadas: {processed_folders}")
+        self.logger.info(f"Erros: {errors}")
+        if processed_folders > 0:
+            self.logger.info(f"Taxa de sucesso: {(processed_folders/(processed_folders+errors))*100:.1f}%")
+
+    def _process_single_folder(self, folder_name: str, full_path: str) -> bool:
+        """
+        Processa uma única pasta e a insere no banco de dados.
+        
+        Args:
+            folder_name: Nome da pasta
+            full_path: Caminho completo da pasta
+            
+        Returns:
+            True se a pasta foi processada com sucesso, False caso contrário.
+        """
+        try:
+            parent_path = str(Path(full_path).parent)
+            self.insert_record(folder_name, full_path, parent_path, None, None, 'folder')
+            return True
+        except (OSError, PermissionError) as e:
+            self.logger.warning(f"Não foi possível indexar a pasta {full_path}: {e}")
+            return False
+
+    def insert_batch_records(self, batch_data: List[Tuple]):
+        """
+        Insere um lote de registros de arquivos no banco de dados de forma thread-safe
+        
+        Args:
+            batch_data: Lista de tuplas com dados dos arquivos (filename, full_path, file_size, modified_date)
+        """
+        records_to_insert = []
+        for filename, full_path, file_size, modified_date in batch_data:
+            parent_path = str(Path(full_path).parent)
+            records_to_insert.append((filename, full_path, parent_path, file_size, modified_date, 'file'))
+
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.executemany('''
+                INSERT OR REPLACE INTO files 
+                (filename, full_path, parent_path, file_size, modified_date, item_type)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', records_to_insert)
+            conn.commit()
+        except sqlite3.Error as e:
+            self.logger.error(f"Erro ao inserir lote de registros: {e}")
+            raise
     
+    def insert_record(self, filename: str, full_path: str, parent_path: Optional[str],
+                      file_size: Optional[int], modified_date: Optional[str], item_type: str):
+        """
+        Insere um registro (arquivo ou pasta) no banco de dados
+        
+        Args:
+            filename: Nome do arquivo/pasta
+            full_path: Caminho completo do arquivo/pasta
+            parent_path: Caminho da pasta pai
+            file_size: Tamanho do arquivo em bytes (None para pastas)
+            modified_date: Data de modificação (None para pastas)
+            item_type: Tipo do item ('file' ou 'folder')
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute('''
+                INSERT OR REPLACE INTO files 
+                (filename, full_path, parent_path, file_size, modified_date, item_type)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (filename, full_path, parent_path, file_size, modified_date, item_type))
+            conn.commit()
+        except sqlite3.Error as e:
+            self.logger.error(f"Erro ao inserir registro: {e}")
+            raise
+
     def insert_file_record(self, filename: str, full_path: str, 
                           file_size: int, modified_date: str):
         """
-        Insere um registro de arquivo no banco de dados
+        Insere um registro de arquivo no banco de dados (mantido para compatibilidade, mas usa insert_record)
         
         Args:
             filename: Nome do arquivo
@@ -313,16 +441,8 @@ class FileIndexer:
             file_size: Tamanho do arquivo em bytes
             modified_date: Data de modificação do arquivo
         """
-        cursor = self.conn.cursor()
-        try:
-            cursor.execute('''
-                INSERT OR REPLACE INTO files 
-                (filename, full_path, file_size, modified_date)
-                VALUES (?, ?, ?, ?)
-            ''', (filename, full_path, file_size, modified_date))
-        except sqlite3.Error as e:
-            self.logger.error(f"Erro ao inserir registro: {e}")
-            raise
+        parent_path = str(Path(full_path).parent)
+        self.insert_record(filename, full_path, parent_path, file_size, modified_date, 'file')
     
     def search_files(self, search_term: str, exact_match: bool = False) -> List[Tuple]:
         """
@@ -335,14 +455,15 @@ class FileIndexer:
         Returns:
             Lista de tuplas com (filename, full_path, file_size, modified_date)
         """
-        cursor = self.conn.cursor()
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
         
         try:
             if exact_match:
-                query = "SELECT filename, full_path, file_size, modified_date FROM files WHERE filename = ?"
+                query = "SELECT filename, full_path, file_size, modified_date FROM files WHERE filename = ? AND item_type = 'file'"
                 cursor.execute(query, (search_term,))
             else:
-                query = "SELECT filename, full_path, file_size, modified_date FROM files WHERE filename LIKE ?"
+                query = "SELECT filename, full_path, file_size, modified_date FROM files WHERE filename LIKE ? AND item_type = 'file'"
                 cursor.execute(query, (f"%{search_term}%",))
             
             results = cursor.fetchall()
@@ -362,13 +483,14 @@ class FileIndexer:
         Returns:
             Lista de tuplas com informações dos arquivos
         """
-        cursor = self.conn.cursor()
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
         
         try:
             if not extension.startswith('.'):
                 extension = '.' + extension
             
-            query = "SELECT filename, full_path, file_size, modified_date FROM files WHERE filename LIKE ?"
+            query = "SELECT filename, full_path, file_size, modified_date FROM files WHERE filename LIKE ? AND item_type = 'file'"
             cursor.execute(query, (f"%{extension}",))
             
             results = cursor.fetchall()
@@ -378,6 +500,35 @@ class FileIndexer:
             self.logger.error(f"Erro na busca por extensão: {e}")
             return []
     
+    def search_folders(self, search_term: str, exact_match: bool = False) -> List[Tuple]:
+        """
+        Busca pastas por nome
+        
+        Args:
+            search_term: Termo de busca
+            exact_match: Se True, busca exata. Se False, busca parcial
+            
+        Returns:
+            Lista de tuplas com (filename, full_path, parent_path)
+        """
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
+        
+        try:
+            if exact_match:
+                query = "SELECT filename, full_path, parent_path FROM files WHERE filename = ? AND item_type = 'folder'"
+                cursor.execute(query, (search_term,))
+            else:
+                query = "SELECT filename, full_path, parent_path FROM files WHERE filename LIKE ? AND item_type = 'folder'"
+                cursor.execute(query, (f"%{search_term}%",))
+            
+            results = cursor.fetchall()
+            return results
+            
+        except sqlite3.Error as e:
+            self.logger.error(f"Erro na busca de pastas: {e}")
+            return []
+
     def get_stats(self) -> dict:
         """
         Retorna estatísticas do índice
@@ -385,22 +536,27 @@ class FileIndexer:
         Returns:
             Dicionário com estatísticas
         """
-        cursor = self.conn.cursor()
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
         
         try:
             # Total de arquivos
-            cursor.execute("SELECT COUNT(*) FROM files")
+            cursor.execute("SELECT COUNT(*) FROM files WHERE item_type = 'file'")
             total_files = cursor.fetchone()[0]
             
-            # Tamanho total
-            cursor.execute("SELECT SUM(file_size) FROM files")
+            # Total de pastas
+            cursor.execute("SELECT COUNT(*) FROM files WHERE item_type = 'folder'")
+            total_folders = cursor.fetchone()[0]
+            
+            # Tamanho total de arquivos
+            cursor.execute("SELECT SUM(file_size) FROM files WHERE item_type = 'file'")
             total_size = cursor.fetchone()[0] or 0
             
             # Extensões mais comuns
             cursor.execute('''
                 SELECT SUBSTR(filename, INSTR(filename, '.')) as extension, COUNT(*) as count
                 FROM files 
-                WHERE filename LIKE '%.%'
+                WHERE filename LIKE '%.%' AND item_type = 'file'
                 GROUP BY extension 
                 ORDER BY count DESC 
                 LIMIT 10
@@ -409,6 +565,7 @@ class FileIndexer:
             
             return {
                 'total_files': total_files,
+                'total_folders': total_folders,
                 'total_size_mb': round(total_size / (1024 * 1024), 2),
                 'top_extensions': top_extensions
             }
@@ -419,19 +576,21 @@ class FileIndexer:
     
     def clear_index(self):
         """Limpa todos os registros do índice"""
-        cursor = self.conn.cursor()
+        conn = self.get_db_connection()
+        cursor = conn.cursor()
         try:
             cursor.execute("DELETE FROM files")
-            self.conn.commit()
+            conn.commit()
             self.logger.info("Índice limpo com sucesso")
         except sqlite3.Error as e:
             self.logger.error(f"Erro ao limpar índice: {e}")
     
     def close(self):
-        """Fecha a conexão com o banco de dados"""
-        if self.conn:
-            self.conn.close()
-            self.logger.info("Conexão com banco de dados fechada")
+        """Fecha a conexão com o banco de dados para a thread atual."""
+        if hasattr(self.thread_local_db, "conn") and self.thread_local_db.conn:
+            self.thread_local_db.conn.close()
+            del self.thread_local_db.conn
+            self.logger.info("Conexão com banco de dados da thread atual fechada")
 
 def format_file_size(size_bytes: int) -> str:
     """Formata o tamanho do arquivo em formato legível"""
@@ -456,6 +615,8 @@ def main():
     parser.add_argument('--workers', type=int, default=8, help='Número de threads para processamento (padrão: 8)')
     parser.add_argument('--streaming', action='store_true', help='Usar modo streaming (melhor para pastas muito grandes)')
     parser.add_argument('--batch', action='store_true', help='Usar modo batch com barra de progresso determinada (padrão)')
+    parser.add_argument('--scan-folders', type=str, help='Caminho da pasta de rede para escanear apenas pastas')
+    parser.add_argument('--search-folders', type=str, help='Buscar pasta por nome')
     
     args = parser.parse_args()
     
@@ -473,9 +634,13 @@ def main():
             else:
                 print("Usando modo batch (barra de progresso determinada)")
                 indexer.scan_network_folder_batch(args.scan, update_existing=False)
+        
+        elif args.scan_folders:
+            print(f"Escaneando apenas pastas em: {args.scan_folders}")
+            indexer.scan_network_folders(args.scan_folders)
             
         elif args.search:
-            print(f"Buscando por: {args.search}")
+            print(f"Buscando por arquivo: {args.search}")
             results = indexer.search_files(args.search, args.exact)
             
             if results:
@@ -489,6 +654,21 @@ def main():
                     print("-" * 80)
             else:
                 print("Nenhum arquivo encontrado.")
+        
+        elif args.search_folders:
+            print(f"Buscando por pasta: {args.search_folders}")
+            results = indexer.search_folders(args.search_folders, args.exact)
+            
+            if results:
+                print(f"\nEncontradas {len(results)} pasta(s):")
+                print("-" * 80)
+                for folder_name, full_path, parent_path in results:
+                    print(f"Pasta: {folder_name}")
+                    print(f"Caminho: {full_path}")
+                    print(f"Pasta Pai: {parent_path}")
+                    print("-" * 80)
+            else:
+                print("Nenhuma pasta encontrada.")
                 
         elif args.extension:
             print(f"Buscando arquivos com extensão: {args.extension}")
@@ -510,7 +690,8 @@ def main():
             stats = indexer.get_stats()
             print("\n=== ESTATÍSTICAS DO ÍNDICE ===")
             print(f"Total de arquivos: {stats.get('total_files', 0):,}")
-            print(f"Tamanho total: {stats.get('total_size_mb', 0):,.2f} MB")
+            print(f"Total de pastas: {stats.get('total_folders', 0):,}")
+            print(f"Tamanho total de arquivos: {stats.get('total_size_mb', 0):,.2f} MB")
             print("\nExtensões mais comuns:")
             for ext, count in stats.get('top_extensions', []):
                 print(f"  {ext}: {count:,} arquivos")
@@ -542,12 +723,14 @@ if __name__ == "__main__":
         try:
             while True:
                 print("\nOpções:")
-                print("1. Escanear pasta de rede (Streaming - baixa memória (muito recomendado))")
+                print("1. Escanear pasta de rede (Streaming - muito recomendado)")
                 print("2. Escanear pasta de rede (Batch - progresso determinado)")
                 print("3. Buscar arquivo")
                 print("4. Buscar por extensão") 
                 print("5. Mostrar estatísticas")
                 print("6. Limpar índice")
+                print("7. Escanear apenas pastas")
+                print("8. Buscar pasta")
                 print("0. Sair")
                 
                 choice = input("\nEscolha uma opção: ").strip()
@@ -629,14 +812,37 @@ if __name__ == "__main__":
                             
                 elif choice == "5":
                     stats = indexer.get_stats()
-                    print(f"\nTotal de arquivos: {stats.get('total_files', 0):,}")
-                    print(f"Tamanho total: {stats.get('total_size_mb', 0):,.2f} MB")
-                    
+                    print("\n=== ESTATÍSTICAS DO ÍNDICE ===")
+                    print(f"Total de arquivos: {stats.get('total_files', 0):,}")
+                    print(f"Total de pastas: {stats.get('total_folders', 0):,}")
+                    print(f"Tamanho total de arquivos: {stats.get('total_size_mb', 0):,.2f} MB")
+                    print("\nExtensões mais comuns:")
+                    for ext, count in stats.get('top_extensions', []):
+                        print(f"  {ext}: {count:,} arquivos")
+                        
                 elif choice == "6":
                     confirm = input("Tem certeza? (s/N): ")
                     if confirm.lower() == 's':
                         indexer.clear_index()
                         
+                elif choice == "7":
+                    path = input("Digite o caminho da pasta de rede para escanear pastas: ").strip()
+                    if path:
+                        indexer.scan_network_folders(path)
+                
+                elif choice == "8":
+                    search_term = input("Digite o nome da pasta: ").strip()
+                    if search_term:
+                        results = indexer.search_folders(search_term)
+                        if results:
+                            print(f"\nEncontradas {len(results)} pasta(s):")
+                            for folder_name, full_path, parent_path in results:
+                                print(f"\nPasta: {folder_name}")
+                                print(f"Caminho: {full_path}")
+                                print(f"Pasta Pai: {parent_path}")
+                        else:
+                            print("Nenhuma pasta encontrada.")
+                            
                 elif choice == "0":
                     break
                     
