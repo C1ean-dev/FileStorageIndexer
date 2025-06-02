@@ -1,0 +1,8 @@
+.venv 
+build/
+dist/
+file_indexer.db
+file_indexer.log
+file_index.db
+pesquisa.spec
+resultados_busca.txt

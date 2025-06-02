@@ -1,0 +1,16 @@
+# Requirements para o File Indexer
+tqdm>=4.64.0
+
+# Bibliotecas utilizadas (built-in):
+# - os
+# - sqlite3
+# - time
+# - pathlib
+# - typing
+# - argparse
+# - logging
+# - threading
+# - queue
+# - concurrent.futures
+
+# Python versão mínima recomendada: 3.6+
