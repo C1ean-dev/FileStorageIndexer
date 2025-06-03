@@ -6,6 +6,7 @@ from typing import List, Tuple, Optional
 import argparse
 import logging
 import threading
+from utils.updateRelease.updater import AppUpdater
 from queue import Queue
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
@@ -713,10 +714,26 @@ def main():
 if __name__ == "__main__":
     # Exemplo de uso interativo se executado diretamente
     if len(os.sys.argv) == 1:
+        # Initialize and check for updates
+        current_app_version = "0.0.0-dev" # Default to development version
+        try:
+            import version
+            current_app_version = version.__version__
+            # Only run updater if a proper version is found (i.e., not in local dev)
+            self.updater = AppUpdater(
+                repo_owner="C1ean-dev", 
+                repo_name="FileStorageIndexer", 
+                current_version=current_app_version
+            )
+            self.updater.check_for_updates()
+        except ImportError:
+            print("Warning: version.py not found. Running in development mode, update checks skipped.")
+            # No updater initialized if in development mode
+
         print("=== INDEXADOR DE ARQUIVOS DE REDE ===\n")
         
-        workers = input("Número de threads para processamento (padrão 2): ").strip()
-        max_workers = int(workers) if workers.isdigit() else 2
+        workers = input("Número de threads para processamento (padrão 8): ").strip()
+        max_workers = int(workers) if workers.isdigit() else 8
         
         indexer = FileIndexer(max_workers=max_workers)
         
