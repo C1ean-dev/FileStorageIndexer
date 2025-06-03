@@ -11,7 +11,7 @@ class AppUpdater:
         self.repo_name = repo_name
         self.current_version = current_version
         self.github_api_url = f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/releases/latest"
-        self.executable_name = "cadastro.exe" # Assuming the executable name
+        self.executable_name = os.path.basename(sys.argv[0]) # Dynamically get the executable name
 
     def get_latest_release_info(self):
         """Fetches the latest release information from GitHub."""
