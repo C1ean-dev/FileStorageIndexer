@@ -30,7 +30,7 @@ jobs:
         run: echo "__version__ = 'v${{ github.run_number }}'" > version.py
 
       - name: Build with PyInstaller
-        run: pyinstaller --onefile --noconsole --name "pesquisa" file_indexer.py
+        run: pyinstaller --onefile --name "pesquisa" file_indexer.py
         #run: pyinstaller --onedir --noconsole --name "pesquisa" file_indexer.py
 
       #- name: Archive build output
