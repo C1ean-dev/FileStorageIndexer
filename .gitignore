@@ -6,3 +6,4 @@ file_indexer.log
 file_index.db
 pesquisa.spec
 resultados_busca.txt
+__pycache__

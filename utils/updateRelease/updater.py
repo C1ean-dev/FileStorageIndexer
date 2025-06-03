@@ -2,6 +2,7 @@
 import requests
 import os
 import sys
+import subprocess
 
 
 class AppUpdater:
@@ -111,6 +112,7 @@ class AppUpdater:
 
     def check_for_updates(self):
         """Checks for updates and performs the update if a new version is available."""
+        current_exe_path = sys.executable # Define current_exe_path here
         print("Checking for updates...")
         latest_release = self.get_latest_release_info()
         if latest_release and self.is_new_version_available(latest_release):
