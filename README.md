@@ -93,8 +93,9 @@ Você também pode usar o script com argumentos de linha de comando para operaç
 ## Estrutura do Projeto
 
 -   `file_indexer.py`: O script principal que contém a lógica do indexador e a interface de usuário.
--   `file_index.db`: O arquivo de banco de dados SQLite onde as informações dos arquivos são armazenadas.
--   `file_indexer.log`: Arquivo de log para registrar operações e erros.
+-   `utils\updateRelease\updater.py`: realiza atualizaçoes baseado nas releases do github.
+-   `file_index.db`: O arquivo de banco de dados SQLite onde as informações dos arquivos são armazenadas. (criado pelo indexer)
+-   `file_indexer.log`: Arquivo de log para registrar operações e erros. (criado pelo indexer)
 
 ## Contribuição
 
