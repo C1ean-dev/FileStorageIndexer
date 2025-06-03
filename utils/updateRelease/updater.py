@@ -2,7 +2,6 @@
 import requests
 import os
 import sys
-from tkinter import messagebox
 
 
 class AppUpdater:
@@ -101,11 +100,10 @@ class AppUpdater:
             # Move new executable to current executable path
             os.rename(temp_exe_path, current_exe_path)
             print("Application updated successfully. Please restart the application.")
-            messagebox.showinfo("Update Successful", "Application updated successfully. Please restart the application.")
             return True
         except OSError as e:
             print(f"Error updating application: {e}")
-            messagebox.showerror("Update Error", f"Failed to update application: {e}\nPlease restart the application manually.")
+            print(f"Failed to update application: {e}\nPlease restart the application manually.")
             # Attempt to revert if rename failed
             if os.path.exists(backup_exe_path) and not os.path.exists(current_exe_path):
                 os.rename(backup_exe_path, current_exe_path)
@@ -119,13 +117,15 @@ class AppUpdater:
             latest_tag_name = latest_release.get("tag_name", "N/A")
             latest_version_str = latest_tag_name.lstrip('v')
             print(f"New version available! Current: {self.current_version}, Latest: {latest_version_str}")
-            response = messagebox.askyesno(
-                "Update Available", 
+            
+            # Use input for confirmation instead of messagebox
+            user_response = input(
                 f"A new version (v{latest_version_str}) is available.\n"
                 f"You are currently on version v{self.current_version}.\n"
-                "Do you want to download and install it now?"
-            )
-            if response:
+                "Do you want to download and install it now? (yes/no): "
+            ).lower().strip()
+
+            if user_response == 'yes':
                 temp_exe_path = self.download_new_version(latest_release)
                 if temp_exe_path:
                     if self.update_application(temp_exe_path):
@@ -133,9 +133,10 @@ class AppUpdater:
                         # This part is tricky for a self-updating executable.
                         # For now, we'll just inform the user.
                         pass
+            else:
+                print("Update cancelled by user.")
         else:
-            print("No new updates available.")
-            # messagebox.showinfo("No Updates", "You are running the latest version.")
+            print("No new updates available. You are running the latest version.")
 
 # Example Usage (for testing purposes, not for direct execution in main app)
 if __name__ == "__main__":
