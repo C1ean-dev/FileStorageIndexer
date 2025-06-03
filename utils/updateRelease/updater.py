@@ -129,14 +129,27 @@ class AppUpdater:
                 temp_exe_path = self.download_new_version(latest_release)
                 if temp_exe_path:
                     if self.update_application(temp_exe_path):
-                        # If update was successful, the application needs to restart
-                        # This part is tricky for a self-updating executable.
-                        # For now, we'll just inform the user.
-                        pass
+                        # If update was successful, restart the application
+                        self._restart_application(current_exe_path)
+                        sys.exit(0) # Exit the current application
             else:
                 print("Update cancelled by user.")
         else:
             print("No new updates available. You are running the latest version.")
+
+    def _restart_application(self, current_exe_path):
+        """Restarts the application using a temporary batch script."""
+        # Create a temporary batch file
+        script_path = os.path.join(os.path.dirname(current_exe_path), "restart_app.bat")
+        
+        with open(script_path, "w") as f:
+            f.write("@echo off\n")
+            f.write(f"timeout /t 1 /nobreak > NUL\n") # Wait for the current process to exit
+            f.write(f'start "" "{current_exe_path}"\n') # Start the new executable
+            f.write(f"del \"{script_path}\"\n") # Delete the batch script itself
+        
+        # Execute the batch file and exit the current application
+        subprocess.Popen([script_path], shell=True, creationflags=subprocess.DETACHED_PROCESS)
 
 # Example Usage (for testing purposes, not for direct execution in main app)
 if __name__ == "__main__":
