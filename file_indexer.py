@@ -720,12 +720,12 @@ if __name__ == "__main__":
             import version
             current_app_version = version.__version__
             # Only run updater if a proper version is found (i.e., not in local dev)
-            self.updater = AppUpdater(
+            updater = AppUpdater(
                 repo_owner="C1ean-dev", 
                 repo_name="FileStorageIndexer", 
                 current_version=current_app_version
             )
-            self.updater.check_for_updates()
+            updater.check_for_updates()
         except ImportError:
             print("Warning: version.py not found. Running in development mode, update checks skipped.")
             # No updater initialized if in development mode
