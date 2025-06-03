@@ -714,156 +714,161 @@ def main():
 if __name__ == "__main__":
     # Exemplo de uso interativo se executado diretamente
     if len(os.sys.argv) == 1:
-        # Initialize and check for updates
-        current_app_version = "0.0.0-dev" # Default to development version
-        try:
-            import version
-            current_app_version = version.__version__
-            # Only run updater if a proper version is found (i.e., not in local dev)
-            updater = AppUpdater(
-                repo_owner="C1ean-dev", 
-                repo_name="FileStorageIndexer", 
-                current_version=current_app_version
-            )
-            updater.check_for_updates()
-        except ImportError:
-            print("Warning: version.py not found. Running in development mode, update checks skipped.")
-            # No updater initialized if in development mode
+        if sys.stdin.isatty(): # Check if running in an interactive terminal
+            # Initialize and check for updates
+            current_app_version = "0.0.0-dev" # Default to development version
+            try:
+                import version
+                current_app_version = version.__version__
+                # Only run updater if a proper version is found (i.e., not in local dev)
+                updater = AppUpdater(
+                    repo_owner="C1ean-dev", 
+                    repo_name="FileStorageIndexer", 
+                    current_version=current_app_version
+                )
+                updater.check_for_updates()
+            except ImportError:
+                print("Warning: version.py not found. Running in development mode, update checks skipped.")
+                # No updater initialized if in development mode
 
-        print("=== INDEXADOR DE ARQUIVOS DE REDE ===\n")
-        
-        workers = input("Número de threads para processamento (padrão 8): ").strip()
-        max_workers = int(workers) if workers.isdigit() else 8
-        
-        indexer = FileIndexer(max_workers=max_workers)
-        
-        try:
-            while True:
-                print("\nOpções:")
-                print("1. Escanear pasta de rede (Streaming - muito recomendado)")
-                print("2. Escanear pasta de rede (Batch - progresso determinado)")
-                print("3. Buscar arquivo")
-                print("4. Buscar por extensão") 
-                print("5. Mostrar estatísticas")
-                print("6. Limpar índice")
-                print("7. Escanear apenas pastas")
-                print("8. Buscar pasta")
-                print("0. Sair")
-                
-                choice = input("\nEscolha uma opção: ").strip()
-                
-                if choice == "1":
-                    path = input("Digite o caminho da pasta de rede: ").strip()
-                    if path:
-                        print("Usando modo streaming (baixo uso de memória)")
-                        indexer.scan_network_folder(path, update_existing=False)
-                        
-                elif choice == "2":
-                    path = input("Digite o caminho da pasta de rede: ").strip()
-                    if path:
-                        print("Usando modo batch (barra de progresso determinada)")
-                        indexer.scan_network_folder_batch(path, update_existing=False)
-                        
-                elif choice == "3":
-                    search_term = input("Digite o nome do arquivo: ").strip()
-                    if search_term:
-                        results = indexer.search_files(search_term)
-                        if results:
-                            print(f"\nEncontrados {len(results)} arquivo(s):")
-                            for filename, full_path, file_size, modified_date in results:
-                                print(f"\nArquivo: {filename}")
-                                print(f"Caminho: {full_path}")
-                                print(f"Tamanho: {format_file_size(file_size)}")
-                        else:
-                            print("Nenhum arquivo encontrado.")
-                            
-                elif choice == "4":
-                    ext = input("Digite a extensão (ex: pdf, docx): ").strip()
-                    if ext:
-                        results = indexer.search_by_extension(ext)
-                        if results:
-                            print(f"\nEncontrados {len(results)} arquivo(s) com extensão .{ext}")
-                            current_display_index = 0
-                            while True:
-                                for filename, full_path, file_size, modified_date in results[current_display_index:current_display_index + 10]:
-                                    print(f"  {filename} - {full_path}")
-                                
-                                current_display_index += 10
-                                
-                                if current_display_index >= len(results):
-                                    print("\nTodos os arquivos foram listados.")
-                                    break
-                                
-                                remaining_files = len(results) - current_display_index
-                                print(f"  ... e mais {remaining_files} arquivos")
-                                
-                                while True:
-                                    action = input("\nOpções:\n1. Listar mais 10 arquivos\n2. Baixar lista completa (TXT)\n3. Voltar ao menu\nEscolha uma opção: ").strip()
-                                    if action == "1":
-                                        break  # Continue o loop externo para listar mais
-                                    elif action == "2":
-                                        output_filename = input("Digite o nome do arquivo TXT para salvar (ex: resultados.txt): ").strip()
-                                        if not output_filename:
-                                            output_filename = "resultados_busca.txt"
-                                        
-                                        try:
-                                            with open(output_filename, "w", encoding="utf-8") as f:
-                                                for filename, full_path, file_size, modified_date in results:
-                                                    f.write(f"Arquivo: {filename}\n")
-                                                    f.write(f"Caminho: {full_path}\n")
-                                                    f.write(f"Tamanho: {format_file_size(file_size)}\n")
-                                                    f.write(f"Modificado: {modified_date}\n")
-                                                    f.write("-" * 80 + "\n")
-                                            print(f"Lista salva em '{output_filename}' com sucesso.")
-                                        except IOError as e:
-                                            print(f"Erro ao salvar arquivo: {e}")
-                                        break # Voltar ao menu principal após salvar
-                                    elif action == "3":
-                                        break # Voltar ao menu principal
-                                    else:
-                                        print("Opção inválida. Tente novamente.")
-                                if action == "2" or action == "3":
-                                    break # Sair do loop principal se o usuário escolheu salvar ou voltar
-                        else:
-                            print("Nenhum arquivo encontrado.")
-                            
-                elif choice == "5":
-                    stats = indexer.get_stats()
-                    print("\n=== ESTATÍSTICAS DO ÍNDICE ===")
-                    print(f"Total de arquivos: {stats.get('total_files', 0):,}")
-                    print(f"Total de pastas: {stats.get('total_folders', 0):,}")
-                    print(f"Tamanho total de arquivos: {stats.get('total_size_mb', 0):,.2f} MB")
-                    print("\nExtensões mais comuns:")
-                    for ext, count in stats.get('top_extensions', []):
-                        print(f"  {ext}: {count:,} arquivos")
-                        
-                elif choice == "6":
-                    confirm = input("Tem certeza? (s/N): ")
-                    if confirm.lower() == 's':
-                        indexer.clear_index()
-                        
-                elif choice == "7":
-                    path = input("Digite o caminho da pasta de rede para escanear pastas: ").strip()
-                    if path:
-                        indexer.scan_network_folders(path)
-                
-                elif choice == "8":
-                    search_term = input("Digite o nome da pasta: ").strip()
-                    if search_term:
-                        results = indexer.search_folders(search_term)
-                        if results:
-                            print(f"\nEncontradas {len(results)} pasta(s):")
-                            for folder_name, full_path, parent_path in results:
-                                print(f"\nPasta: {folder_name}")
-                                print(f"Caminho: {full_path}")
-                                print(f"Pasta Pai: {parent_path}")
-                        else:
-                            print("Nenhuma pasta encontrada.")
-                            
-                elif choice == "0":
-                    break
+            print("=== INDEXADOR DE ARQUIVOS DE REDE ===\n")
+            
+            workers = input("Número de threads para processamento (padrão 8): ").strip()
+            max_workers = int(workers) if workers.isdigit() else 8
+            
+            indexer = FileIndexer(max_workers=max_workers)
+            
+            try:
+                while True:
+                    print("\nOpções:")
+                    print("1. Escanear pasta de rede (Streaming - muito recomendado)")
+                    print("2. Escanear pasta de rede (Batch - progresso determinado)")
+                    print("3. Buscar arquivo")
+                    print("4. Buscar por extensão") 
+                    print("5. Mostrar estatísticas")
+                    print("6. Limpar índice")
+                    print("7. Escanear apenas pastas")
+                    print("8. Buscar pasta")
+                    print("0. Sair")
                     
-        finally:
-            indexer.close()
+                    choice = input("\nEscolha uma opção: ").strip()
+                    
+                    if choice == "1":
+                        path = input("Digite o caminho da pasta de rede: ").strip()
+                        if path:
+                            print("Usando modo streaming (baixo uso de memória)")
+                            indexer.scan_network_folder(path, update_existing=False)
+                            
+                    elif choice == "2":
+                        path = input("Digite o caminho da pasta de rede: ").strip()
+                        if path:
+                            print("Usando modo batch (barra de progresso determinada)")
+                            indexer.scan_network_folder_batch(path, update_existing=False)
+                            
+                    elif choice == "3":
+                        search_term = input("Digite o nome do arquivo: ").strip()
+                        if search_term:
+                            results = indexer.search_files(search_term)
+                            if results:
+                                print(f"\nEncontrados {len(results)} arquivo(s):")
+                                for filename, full_path, file_size, modified_date in results:
+                                    print(f"\nArquivo: {filename}")
+                                    print(f"Caminho: {full_path}")
+                                    print(f"Tamanho: {format_file_size(file_size)}")
+                            else:
+                                print("Nenhum arquivo encontrado.")
+                                
+                    elif choice == "4":
+                        ext = input("Digite a extensão (ex: pdf, docx): ").strip()
+                        if ext:
+                            results = indexer.search_by_extension(ext)
+                            if results:
+                                print(f"\nEncontrados {len(results)} arquivo(s) com extensão .{ext}")
+                                current_display_index = 0
+                                while True:
+                                    for filename, full_path, file_size, modified_date in results[current_display_index:current_display_index + 10]:
+                                        print(f"  {filename} - {full_path}")
+                                    
+                                    current_display_index += 10
+                                    
+                                    if current_display_index >= len(results):
+                                        print("\nTodos os arquivos foram listados.")
+                                        break
+                                    
+                                    remaining_files = len(results) - current_display_index
+                                    print(f"  ... e mais {remaining_files} arquivos")
+                                    
+                                    while True:
+                                        action = input("\nOpções:\n1. Listar mais 10 arquivos\n2. Baixar lista completa (TXT)\n3. Voltar ao menu\nEscolha uma opção: ").strip()
+                                        if action == "1":
+                                            break  # Continue o loop externo para listar mais
+                                        elif action == "2":
+                                            output_filename = input("Digite o nome do arquivo TXT para salvar (ex: resultados.txt): ").strip()
+                                            if not output_filename:
+                                                output_filename = "resultados_busca.txt"
+                                            
+                                            try:
+                                                with open(output_filename, "w", encoding="utf-8") as f:
+                                                    for filename, full_path, file_size, modified_date in results:
+                                                        f.write(f"Arquivo: {filename}\n")
+                                                        f.write(f"Caminho: {full_path}\n")
+                                                        f.write(f"Tamanho: {format_file_size(file_size)}\n")
+                                                        f.write(f"Modificado: {modified_date}\n")
+                                                        f.write("-" * 80 + "\n")
+                                                print(f"Lista salva em '{output_filename}' com sucesso.")
+                                            except IOError as e:
+                                                print(f"Erro ao salvar arquivo: {e}")
+                                            break # Voltar ao menu principal após salvar
+                                        elif action == "3":
+                                            break # Voltar ao menu principal
+                                        else:
+                                            print("Opção inválida. Tente novamente.")
+                                    if action == "2" or action == "3":
+                                        break # Sair do loop principal se o usuário escolheu salvar ou voltar
+                            else:
+                                print("Nenhum arquivo encontrado.")
+                                
+                    elif choice == "5":
+                        stats = indexer.get_stats()
+                        print("\n=== ESTATÍSTICAS DO ÍNDICE ===")
+                        print(f"Total de arquivos: {stats.get('total_files', 0):,}")
+                        print(f"Total de pastas: {stats.get('total_folders', 0):,}")
+                        print(f"Tamanho total de arquivos: {stats.get('total_size_mb', 0):,.2f} MB")
+                        print("\nExtensões mais comuns:")
+                        for ext, count in stats.get('top_extensions', []):
+                            print(f"  {ext}: {count:,} arquivos")
+                            
+                    elif choice == "6":
+                        confirm = input("Tem certeza? (s/N): ")
+                        if confirm.lower() == 's':
+                            indexer.clear_index()
+                            
+                    elif choice == "7":
+                        path = input("Digite o caminho da pasta de rede para escanear pastas: ").strip()
+                        if path:
+                            indexer.scan_network_folders(path)
+                    
+                    elif choice == "8":
+                        search_term = input("Digite o nome da pasta: ").strip()
+                        if search_term:
+                            results = indexer.search_folders(search_term)
+                            if results:
+                                print(f"\nEncontradas {len(results)} pasta(s):")
+                                for folder_name, full_path, parent_path in results:
+                                    print(f"\nPasta: {folder_name}")
+                                    print(f"Caminho: {full_path}")
+                                    print(f"Pasta Pai: {parent_path}")
+                            else:
+                                print("Nenhuma pasta encontrada.")
+                                
+                    elif choice == "0":
+                        break
+                        
+            finally:
+                indexer.close()
+        else:
+            print("Interactive mode skipped: Not running in a TTY. Please provide command-line arguments.")
+            # If not running in a TTY, proceed to call main() with parsed arguments
+            main()
     else:
         main()
