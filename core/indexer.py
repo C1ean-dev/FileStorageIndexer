@@ -1,3 +1,4 @@
+import os
 import threading
 from core.submodules.search_modules.search_files import search_files_func
 from core.submodules.search_modules.search_by_extension import search_by_extension_func
@@ -18,7 +19,7 @@ from core.submodules.stats_modules.get_stats import get_stats_func
 from core.submodules.stats_modules.clear_index import clear_index_func
 
 class FileIndexer:
-    def __init__(self, db_path: str = "file_index.db", max_workers: int = 8):
+    def __init__(self, db_path: str = "file_index.db", max_workers: int = os.cpu_count() - 1):
         self.db_path = db_path
         self.max_workers = max_workers
         self.thread_local_db = threading.local()

@@ -4,16 +4,16 @@ Este é um script Python para indexar arquivos em pastas de rede (ou locais) e p
 
 ## Funcionalidades
 
-- **Escaneamento de Pastas:** Indexa recursivamente arquivos em um caminho de rede ou local.
+- **Escaneamento de Arquivos:** Indexa recursivamente arquivos em um caminho de rede ou local.
   - **Modo Streaming:** Ideal para pastas muito grandes, com baixo uso de memória.
   - **Modo Batch:** Exibe uma barra de progresso determinada, melhor para pastas de tamanho médio.
-- **Busca Rápida:**
-  - Busca arquivos por nome (exata ou parcial).
+- **Escaneamento de Pastas:** Indexa recursivamente Pastas.
+- **Busca Rápida via index:**
+  - Busca arquivos por nome (exata ou parcial fazendo primeiro uma query sem like depois com like).
   - Busca arquivos por extensão (ex: `.pdf`, `.docx`).
 - **Estatísticas:** Exibe o total de arquivos indexados, tamanho total e as extensões de arquivo mais comuns.
 - **Limpeza de Índice:** Permite limpar todos os registros do banco de dados.
 - **Interface Interativa:** Um menu de linha de comando para fácil interação.
-- **Exportação de Resultados:** Opção de salvar resultados de busca por extensão em um arquivo de texto (`.txt`).
 
 ## Requisitos
 
@@ -40,10 +40,12 @@ No menu, você poderá escolher entre as seguintes opções:
 
 1.  **Escanear pasta de rede (Streaming):** Digite o caminho da pasta para iniciar o escaneamento. Recomendado para grandes volumes de dados.
 2.  **Escanear pasta de rede (Batch):** Digite o caminho da pasta para iniciar o escaneamento. Exibe uma barra de progresso.
-3.  **Buscar arquivo:** Digite o nome do arquivo para buscar.
-4.  **Buscar por extensão:** Digite a extensão (ex: `pdf`, `docx`). Se houver muitos resultados, você poderá listar mais, baixar a lista completa em TXT ou voltar ao menu.
-5.  **Mostrar estatísticas:** Exibe informações sobre o índice.
-6.  **Limpar índice:** Remove todos os arquivos indexados do banco de dados.
+3.  **Escanear apenas pastas:** Digite o caminho da pasta para iniciar o escaneamento.
+4.  **Buscar arquivo:** Digite o nome do arquivo para buscar.
+5.  **Buscar por extensão:** Digite a extensão (ex: `pdf`, `docx`). Se houver muitos resultados, você poderá listar mais, baixar a lista completa em TXT ou voltar ao menu.
+6.  **Escanear apenas pastas:** Digite o nome da pasta para buscar.
+7.  **Mostrar estatísticas:** Exibe informações sobre o índice.
+8.  **Limpar índice:** Remove todos os arquivos indexados do banco de dados.
 0.  **Sair:** Encerra o programa.
 
 ### Execução por Linha de Comando (Argumentos)

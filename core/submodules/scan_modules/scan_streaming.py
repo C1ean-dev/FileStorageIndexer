@@ -15,7 +15,7 @@ def scan_network_folder_func(indexer, network_path: str, update_existing: bool =
     processed_files = 0
     errors = 0
     batch_data = []
-    batch_size = 100
+    batch_size = 1000
     
     file_queue = Queue(maxsize=1000)
     
@@ -29,7 +29,6 @@ def scan_network_folder_func(indexer, network_path: str, update_existing: bool =
                     files_found_in_collector += 1
                     if files_found_in_collector % 1000 == 0:
                         indexer.logger.info(f"Coletados {files_found_in_collector} arquivos na fila...")
-            
         except Exception as e:
             indexer.logger.error(f"Erro durante coleta de arquivos: {e}")
         finally:
