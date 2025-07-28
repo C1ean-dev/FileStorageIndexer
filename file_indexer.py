@@ -40,12 +40,12 @@ def main_menu():
             choices = {
                 "1": lambda: scan_streaming_menu(indexer),
                 "2": lambda: scan_batch_menu(indexer),
-                "3": lambda: search_file_menu(indexer),
-                "4": lambda: search_extension_menu(indexer),
-                "5": lambda: show_stats_menu(indexer),
-                "6": lambda: clear_index_menu(indexer),
-                "7": lambda: scan_folders_menu(indexer),
-                "8": lambda: search_folder_menu(indexer),
+                "3": lambda: scan_folders_menu(indexer),
+                "4": lambda: search_file_menu(indexer), 
+                "5": lambda: search_extension_menu(indexer), 
+                "6": lambda: search_folder_menu(indexer),
+                "7": lambda: show_stats_menu(indexer),
+                "8": lambda: clear_index_menu(indexer),
                 "0": lambda: False
             }
             choice = input("\nEscolha uma opção: ").strip()
