@@ -124,7 +124,7 @@ class AppUpdater:
             latest_version_str = latest_tag_name.lstrip('v')
             release_notes = latest_release.get("body", "No release notes available.")
             
-            print(f"{BLUE}New version available! Current: {self.current_version}, Latest: {latest_version_str}{RESET}")
+            print(f"{GREEN}New version available! Current: {self.current_version}, Latest: {latest_version_str}{RESET}")
             print(f"{BLUE}\nRelease Notes:{RESET}")
             print(f"{BLUE}{release_notes}{RESET}")
             print(f"{BLUE}" + "-" * 20 + f"{RESET}") # Separator for clarity
