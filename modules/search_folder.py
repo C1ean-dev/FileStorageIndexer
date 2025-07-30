@@ -1,15 +1,17 @@
 import os
 from core.indexer import FileIndexer
 
+RED = '\033[91m'
+BLUE = '\033[94m'
+GREEN = '\033[92m'
+RESET = '\033[0m'
+
 def search_folder_menu(indexer: FileIndexer):
-    RED = '\033[91m'
-    RESET = '\033[0m'
-    GREEN = '\033[92m'
     """Handles the 'Search Folder' menu option."""
     while True:
-        search_term = input("Digite o nome da pasta (ou '0' para voltar): ").strip()
+        search_term = input(f"{BLUE}Digite o nome da pasta (ou '0' para voltar): {RESET}").strip()
         if search_term == '0':
-            print("Voltando ao menu principal...")
+            print(f"{BLUE}Voltando ao menu principal...{RESET}")
             break # Exit the loop
 
         if search_term:
@@ -23,11 +25,11 @@ def search_folder_menu(indexer: FileIndexer):
                     except OSError as e:
                         print(f"{RED}Erro ao abrir a pasta: {e}{RESET}")
                 else:
-                    print(f"\nEncontradas {len(results)} pasta(s):")
+                    print(f"{BLUE}\nEncontradas {len(results)} pasta(s):{RESET}")
                     for folder_name, full_path, parent_path in results:
-                        print(f"\nPasta: {folder_name}")
-                        print(f"Caminho: \"{full_path}\"")
-                        print(f"Pasta Pai: {parent_path}")
+                        print(f"{BLUE}\nPasta: {folder_name}{RESET}")
+                        print(f"{BLUE}Caminho: \"{full_path}\"{RESET}")
+                        print(f"{BLUE}Pasta Pai: {parent_path}{RESET}")
             else:
                 print(f"{RED}Nenhuma pasta encontrada.{RESET}")
         else:

@@ -4,6 +4,10 @@ import os
 import sys
 import subprocess
 
+RED = '\033[91m'
+BLUE = '\033[94m'
+GREEN = '\033[92m'
+RESET = '\033[0m'
 
 class AppUpdater:
     def __init__(self, repo_owner, repo_name, current_version):
@@ -20,7 +24,7 @@ class AppUpdater:
             response.raise_for_status() # Raise an exception for HTTP errors
             return response.json()
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching latest release info: {e}")
+            print(f"{RED}Error fetching latest release info: {e}{RESET}")
             return None
 
     def is_new_version_available(self, latest_release):
@@ -60,11 +64,11 @@ class AppUpdater:
                 break
 
         if not download_url:
-            print(f"Executable '{self.executable_name}' not found in the latest release assets.")
+            print(f"{RED}Executable '{self.executable_name}' not found in the latest release assets.{RESET}")
             return False
 
         try:
-            print(f"Downloading new version from: {download_url}")
+            print(f"{BLUE}Downloading new version from: {download_url}{RESET}")
             response = requests.get(download_url, stream=True)
             response.raise_for_status()
 
@@ -73,10 +77,10 @@ class AppUpdater:
             with open(temp_exe_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
-            print(f"Downloaded new version to: {temp_exe_path}")
+            print(f"{GREEN}Downloaded new version to: {temp_exe_path}{RESET}")
             return temp_exe_path
         except requests.exceptions.RequestException as e:
-            print(f"Error downloading new version: {e}")
+            print(f"{RED}Error downloading new version: {e}{RESET}")
             return None
 
     def update_application(self, temp_exe_path):
@@ -100,11 +104,11 @@ class AppUpdater:
             
             # Move new executable to current executable path
             os.rename(temp_exe_path, current_exe_path)
-            print("Application updated successfully. Please restart the application.")
+            print(f"{GREEN}Application updated successfully. Please restart the application.{RESET}")
             return True
         except OSError as e:
-            print(f"Error updating application: {e}")
-            print(f"Failed to update application: {e}\nPlease restart the application manually.")
+            print(f"{RED}Error updating application: {e}{RESET}")
+            print(f"{RED}Failed to update application: {e}\nPlease restart the application manually.{RESET}")
             # Attempt to revert if rename failed
             if os.path.exists(backup_exe_path) and not os.path.exists(current_exe_path):
                 os.rename(backup_exe_path, current_exe_path)
@@ -113,23 +117,23 @@ class AppUpdater:
     def check_for_updates(self):
         """Checks for updates and performs the update if a new version is available."""
         current_exe_path = sys.executable # Define current_exe_path here
-        print("Checking for updates...")
+        print(f"{BLUE}Checking for updates...{RESET}")
         latest_release = self.get_latest_release_info()
         if latest_release and self.is_new_version_available(latest_release):
             latest_tag_name = latest_release.get("tag_name", "N/A")
             latest_version_str = latest_tag_name.lstrip('v')
             release_notes = latest_release.get("body", "No release notes available.")
             
-            print(f"New version available! Current: {self.current_version}, Latest: {latest_version_str}")
-            print("\nRelease Notes:")
-            print(release_notes)
-            print("-" * 20) # Separator for clarity
+            print(f"{BLUE}New version available! Current: {self.current_version}, Latest: {latest_version_str}{RESET}")
+            print(f"{BLUE}\nRelease Notes:{RESET}")
+            print(f"{BLUE}{release_notes}{RESET}")
+            print(f"{BLUE}" + "-" * 20 + f"{RESET}") # Separator for clarity
 
             # Use input for confirmation instead of messagebox
             user_response = input(
-                f"A new version (v{latest_version_str}) is available.\n"
+                f"{BLUE}A new version (v{latest_version_str}) is available.\n"
                 f"You are currently on version v{self.current_version}.\n"
-                "Do you want to download and install it now? (yes/no): "
+                "Do you want to download and install it now? (yes/no): {RESET}"
             ).lower().strip()
 
             if user_response == 'yes':
@@ -140,9 +144,9 @@ class AppUpdater:
                         self._restart_application(current_exe_path)
                         sys.exit(0) # Exit the current application
             else:
-                print("Update cancelled by user.")
+                print(f"{BLUE}Update cancelled by user.{RESET}")
         else:
-            print("No new updates available. You are running the latest version.")
+            print(f"{BLUE}No new updates available. You are running the latest version.{RESET}")
 
     def _restart_application(self, current_exe_path):
         """Restarts the application using a temporary batch script."""
