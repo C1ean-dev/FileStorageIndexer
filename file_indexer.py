@@ -49,13 +49,16 @@ def main_menu():
                 "0": lambda: False
             }
             choice = input("\nEscolha uma opção: ").strip()
+            RED = '\033[91m'
+            RESET = '\033[0m'
+            GREEN = '\033[92m'
             if choice in choices:
                 if choice == "0":
                     running = False
                 else:
                     choices[choice]()
             else:
-                print("Opção inválida. Por favor, escolha uma opção válida.")
+                print(f"{RED}Opção inválida. Por favor, escolha uma opção válida.{RESET}")
     finally:
         print("Saindo do indexador de arquivos. Fechando conexão com o banco de dados...")
         indexer.close()

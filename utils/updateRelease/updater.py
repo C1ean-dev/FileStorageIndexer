@@ -118,8 +118,13 @@ class AppUpdater:
         if latest_release and self.is_new_version_available(latest_release):
             latest_tag_name = latest_release.get("tag_name", "N/A")
             latest_version_str = latest_tag_name.lstrip('v')
-            print(f"New version available! Current: {self.current_version}, Latest: {latest_version_str}")
+            release_notes = latest_release.get("body", "No release notes available.")
             
+            print(f"New version available! Current: {self.current_version}, Latest: {latest_version_str}")
+            print("\nRelease Notes:")
+            print(release_notes)
+            print("-" * 20) # Separator for clarity
+
             # Use input for confirmation instead of messagebox
             user_response = input(
                 f"A new version (v{latest_version_str}) is available.\n"
