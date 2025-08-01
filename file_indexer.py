@@ -11,7 +11,7 @@ from modules.clear_index import clear_index_menu
 from modules.scan_folders import scan_folders_menu
 from modules.search_folder import search_folder_menu
 from modules.display_menu import display_menu
-from create_shortcut import create_shortcut
+from utils.shortcut.create_shortcut import create_shortcut
 
 def main_menu():
     print("=== INDEXADOR DE ARQUIVOS DE REDE ===\n")
