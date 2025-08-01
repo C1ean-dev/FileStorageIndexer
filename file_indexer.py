@@ -11,6 +11,7 @@ from modules.clear_index import clear_index_menu
 from modules.scan_folders import scan_folders_menu
 from modules.search_folder import search_folder_menu
 from modules.display_menu import display_menu
+from create_shortcut import create_shortcut
 
 def main_menu():
     print("=== INDEXADOR DE ARQUIVOS DE REDE ===\n")
@@ -46,6 +47,7 @@ def main_menu():
                 "6": lambda: search_folder_menu(indexer),
                 "7": lambda: show_stats_menu(indexer),
                 "8": lambda: clear_index_menu(indexer),
+                "9": lambda: create_shortcut(),
                 "0": lambda: False
             }
             choice = input("\nEscolha uma opção: ").strip()

@@ -18,7 +18,8 @@ def display_menu():
         6. Buscar pasta{RESET}
         {YELLOW}--- Configurações e Status ---
         7. Mostrar estatísticas
-        8. Limpar índice{RESET}
+        8. Limpar índice
+        9. Criar atalho na área de trabalho{RESET}
         {RED}--- Sair ---
         0. Sair{RESET}
     """
