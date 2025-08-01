@@ -3,6 +3,7 @@ import requests
 import os
 import sys
 import subprocess
+import win32com.client
 
 RED = '\033[91m'
 BLUE = '\033[94m'
@@ -122,23 +123,39 @@ class AppUpdater:
             print(f"{BLUE}No new updates available. You are running the latest version.{RESET}")
 
     def _restart_application(self, current_exe_path, temp_exe_path):
-        """Restarts the application using a temporary batch script to replace the executable."""
-        script_path = os.path.join(os.path.dirname(current_exe_path), "restart_app.bat")
+        """Restarts the application using WScript.Shell to replace the executable."""
+        shell = win32com.client.Dispatch("WScript.Shell")
         
+        # Commands to be executed in a new command prompt
+        # 0 means hide the window, 1 means show it. 
+        # 'True' means wait for the command to complete, 'False' means don't wait.
+        commands = [
+            f'timeout /t 2 /nobreak > NUL',
+            f'del "{current_exe_path}"',
+            f'rename "{temp_exe_path}" "{os.path.basename(current_exe_path)}"',
+            f'start "" "{current_exe_path}"'
+        ]
+        
+        # The command is wrapped in `cmd /c` to ensure it runs in a command shell
+        full_command = 'cmd /c "' + ' & '.join(commands) + '"'
+        
+        try:
+            shell.Run(full_command, 0, False) # Run hidden and don't wait
+        except Exception as e:
+            print(f"{RED}Failed to restart application using WScript.Shell: {e}{RESET}")
+            # Fallback to batch script if WScript.Shell fails
+            self._restart_with_batch_fallback(current_exe_path, temp_exe_path)
+
+    def _restart_with_batch_fallback(self, current_exe_path, temp_exe_path):
+        """Fallback to batch script if WScript.Shell fails."""
+        script_path = os.path.join(os.path.dirname(current_exe_path), "restart_app.bat")
         with open(script_path, "w") as f:
             f.write("@echo off\n")
-            f.write("echo Aguardando o processo principal finalizar...\n")
-            f.write("timeout /t 2 /nobreak > NUL\n")  # Wait for the current process to exit
-            
-            f.write(f"echo Substituindo o executável antigo...\n")
+            f.write("timeout /t 2 /nobreak > NUL\n")
             f.write(f"del \"{current_exe_path}\"\n")
             f.write(f"rename \"{temp_exe_path}\" \"{os.path.basename(current_exe_path)}\"\n")
-            
-            f.write("echo Reiniciando a aplicação...\n")
-            f.write(f'start "" "{current_exe_path}"\n')  # Start the new executable
-            
-            f.write("(goto) 2>nul & del \"%~f0\"\n") # Self-delete the batch script
-
+            f.write(f'start "" "{current_exe_path}"\n')
+            f.write("(goto) 2>nul & del \"%~f0\"\n")
         subprocess.Popen([script_path], shell=True, creationflags=subprocess.DETACHED_PROCESS)
 
 # Example Usage (for testing purposes, not for direct execution in main app)
