@@ -133,7 +133,7 @@ class AppUpdater:
             user_response = input(
                 f"{BLUE}A new version (v{latest_version_str}) is available.\n"
                 f"You are currently on version v{self.current_version}.\n"
-                "Do you want to download and install it now? (yes/no): {RESET}"
+                f"Do you want to download and install it now? (yes/no): {RESET}"
             ).lower().strip()
 
             if user_response == 'yes':
