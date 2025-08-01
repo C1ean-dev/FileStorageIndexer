@@ -136,7 +136,7 @@ class AppUpdater:
                 f"Do you want to download and install it now? (yes/no): {RESET}"
             ).lower().strip()
 
-            if user_response == 'yes' and user_response == 'y':
+            if user_response == 'yes' or user_response == 'y':
                 temp_exe_path = self.download_new_version(latest_release)
                 if temp_exe_path:
                     if self.update_application(temp_exe_path):
