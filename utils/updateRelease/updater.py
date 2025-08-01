@@ -1,8 +1,8 @@
-
 import requests
 import os
 import sys
 import subprocess
+import win32com.client
 
 RED = '\033[91m'
 BLUE = '\033[94m'
@@ -84,35 +84,10 @@ class AppUpdater:
             return None
 
     def update_application(self, temp_exe_path):
-        """Replaces the current executable with the new one."""
+        """Initiates the application update and restart process."""
         current_exe_path = sys.executable
-        
-        # On Windows, you can't replace a running executable directly.
-        # A common workaround is to use a small batch script or a separate process
-        # to replace the file after the current application exits.
-        
-        # For simplicity, this example will attempt a direct replacement,
-        # which will likely fail on Windows if the app is running.
-        # A more robust solution would involve a separate updater script.
-
-        try:
-            # Rename current executable to a backup
-            backup_exe_path = current_exe_path + ".old"
-            if os.path.exists(backup_exe_path):
-                os.remove(backup_exe_path)
-            os.rename(current_exe_path, backup_exe_path)
-            
-            # Move new executable to current executable path
-            os.rename(temp_exe_path, current_exe_path)
-            print(f"{GREEN}Application updated successfully. Please restart the application.{RESET}")
-            return True
-        except OSError as e:
-            print(f"{RED}Error updating application: {e}{RESET}")
-            print(f"{RED}Failed to update application: {e}\nPlease restart the application manually.{RESET}")
-            # Attempt to revert if rename failed
-            if os.path.exists(backup_exe_path) and not os.path.exists(current_exe_path):
-                os.rename(backup_exe_path, current_exe_path)
-            return False
+        self._restart_application(current_exe_path, temp_exe_path)
+        return True
 
     def check_for_updates(self):
         """Checks for updates and performs the update if a new version is available."""
@@ -136,30 +111,56 @@ class AppUpdater:
                 f"Do you want to download and install it now? (yes/no): {RESET}"
             ).lower().strip()
 
-            if user_response.lower() in ['yes', 'y']:
+            if user_response in ['yes', 'y']:
                 temp_exe_path = self.download_new_version(latest_release)
                 if temp_exe_path:
                     if self.update_application(temp_exe_path):
-                        # If update was successful, restart the application
-                        self._restart_application(current_exe_path)
                         sys.exit(0) # Exit the current application
             else:
                 print(f"{BLUE}Update cancelled by user.{RESET}")
         else:
             print(f"{BLUE}No new updates available. You are running the latest version.{RESET}")
 
-    def _restart_application(self, current_exe_path):
-        """Restarts the application using a temporary batch script."""
-        # Create a temporary batch file
-        script_path = os.path.join(os.path.dirname(current_exe_path), "restart_app.bat")
+    def _restart_application(self, current_exe_path, temp_exe_path):
+        """Restarts the application using WScript.Shell to replace the executable."""
+        shell = win32com.client.Dispatch("WScript.Shell")
         
+        # Commands to be executed in a new command prompt
+        # 0 means hide the window, 1 means show it. 
+        # 'True' means wait for the command to complete, 'False' means don't wait.
+        commands = [
+            f'timeout /t 2 /nobreak > NUL',
+            f'del "{current_exe_path}"',
+            f'rename "{temp_exe_path}" "{os.path.basename(current_exe_path)}"',
+            f'start "" "{current_exe_path}"'
+        ]
+        
+        # The command is wrapped in `cmd /c` to ensure it runs in a command shell
+        full_command = 'cmd /c "' + ' & '.join(commands) + '"'
+        
+        try:
+            shell.Run(full_command, 0, False) # Run hidden and don't wait
+        except Exception as e:
+            print(f"{RED}Failed to restart application using WScript.Shell: {e}{RESET}")
+            # Fallback to batch script if WScript.Shell fails
+            self._restart_with_batch_fallback(current_exe_path, temp_exe_path)
+
+    def _restart_with_batch_fallback(self, current_exe_path, temp_exe_path):
+        """Fallback to batch script if WScript.Shell fails, with logging."""
+        script_path = os.path.join(os.path.dirname(current_exe_path), "restart_app.bat")
+        log_file = os.path.join(os.path.dirname(current_exe_path), "log_bat.txt")
         with open(script_path, "w") as f:
             f.write("@echo off\n")
-            f.write(f"timeout /t 1 /nobreak > NUL\n") # Wait for the current process to exit
-            f.write(f'start "" "{current_exe_path}"\n') # Start the new executable
-            #f.write(f"del \"{script_path}\"\n") # Delete the batch script itself
-        
-        # Execute the batch file and exit the current application
+            f.write(f'echo %date% %time% - Starting update >> "{log_file}"\n')
+            f.write("timeout /t 2 /nobreak > NUL\n")
+            f.write(f'echo %date% %time% - Deleting old executable >> "{log_file}"\n')
+            f.write(f"del \"{current_exe_path}\"\n")
+            f.write(f'echo %date% %time% - Renaming new executable >> "{log_file}"\n')
+            f.write(f"rename \"{temp_exe_path}\" \"{os.path.basename(current_exe_path)}\"\n")
+            f.write(f'echo %date% %time% - Restarting application >> "{log_file}"\n')
+            f.write(f'start "" "{current_exe_path}"\n')
+            f.write(f'echo %date% %time% - Update script finished >> "{log_file}"\n')
+            f.write("(goto) 2>nul & del \"%~f0\"\n")
         subprocess.Popen([script_path], shell=True, creationflags=subprocess.DETACHED_PROCESS)
 
 # Example Usage (for testing purposes, not for direct execution in main app)
