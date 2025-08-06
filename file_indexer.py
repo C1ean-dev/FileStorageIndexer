@@ -1,5 +1,6 @@
 import sys
 import os
+import threading # Import threading for the Event object
 from core.indexer import FileIndexer
 from utils.updateRelease.updater import AppUpdater
 from modules.scan_streaming import scan_streaming_menu
@@ -12,6 +13,7 @@ from modules.scan_folders import scan_folders_menu
 from modules.search_folder import search_folder_menu
 from modules.display_menu import display_menu
 from utils.shortcut.create_shortcut import create_shortcut
+from config import ENABLE_BACKGROUND_UPDATE # Import the feature flag
 
 def main_menu():
     print("=== INDEXADOR DE ARQUIVOS DE REDE ===\n")
@@ -33,6 +35,22 @@ def main_menu():
 
     max_workers = os.cpu_count() - 1
     indexer = FileIndexer(max_workers=max_workers)
+
+    # --- Background Update Setup ---
+    background_thread = None
+    background_stop_event = None
+
+    if ENABLE_BACKGROUND_UPDATE:
+        # Start the background update thread immediately, it will fetch mapped paths internally
+        background_stop_event = threading.Event()
+        background_thread, _ = indexer.start_background_update(
+            interval_seconds=300, # Check every 5 minutes (300 seconds)
+            stop_event=background_stop_event
+        )
+        indexer.logger.info("Processo de atualização em segundo plano iniciado.")
+    else:
+        indexer.logger.info("Atualização em segundo plano desabilitada por feature flag.")
+    # --- End Background Update Setup ---
 
     running = True
     try:
@@ -58,10 +76,19 @@ def main_menu():
                 if choice == "0":
                     running = False
                 else:
-                    choices[choice]()
+                    choices[choice]() # Execute the chosen menu option
+                    # The background update process will now run continuously in its own thread
+                    # without pausing during user interaction.
             else:
                 print(f"{RED}Opção inválida. Por favor, escolha uma opção válida.{RESET}")
     finally:
+        # Ensure the background thread is stopped on application exit
+        if background_stop_event and background_thread and background_thread.is_alive():
+            indexer.logger.info("Sinalizando thread de atualização em segundo plano para finalizar...")
+            background_stop_event.set()
+            # No need to join here, as the background thread should be daemon and exit with main thread.
+            # If it's not a daemon, joining here would block application exit.
+            # Since it's daemon, it will terminate when the main program exits.
         print("Saindo do indexador de arquivos. Fechando conexão com o banco de dados...")
         indexer.close()
 

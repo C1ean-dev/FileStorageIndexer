@@ -47,7 +47,16 @@ No menu, você poderá escolher entre as seguintes opções:
 7.  **Mostrar estatísticas:** Exibe informações sobre o índice.
 8.  **Limpar índice:** Remove todos os arquivos indexados do banco de dados.
 0.  **Sair:** Encerra o programa.
-
+### Processo de atualização em background
+Agora o software atualiza o banco de dados sem a necessidade do usuario realizar um novo scaneamento por ser um processo demorado ele roda em background enquanto a aplicação está em execução abaixo os processos que ele realiza.
+- **Obter Estado Atual do Sistema de Arquivos:**
+    ele ira percorrer o sistema real capturando suas informaçoes e criando um snapshot
+- **Obter Estado Atual do Banco de Dados** 
+    consulta o banco e cria um snapshot do banco 
+- **Comparar e Sincronizar**
+    se um novo objeto é encontrado no snap do sistema de arquivos e não está no snap do banco ele é um NOVO OBJETO chamando indexer.insert_record()
+    Caso ele exista em ambos snap e for um FILE sua data é comparada para verificar se ouve alteração e ele é considerado um objeto atualizado
+    Caso um objeto exista no banco mas nao exista no sistema de arquivos ele vai ser considerado deletado e será removido do banco 
 ### Execução por Linha de Comando (Argumentos)
 
 Você também pode usar o script com argumentos de linha de comando para operações específicas:

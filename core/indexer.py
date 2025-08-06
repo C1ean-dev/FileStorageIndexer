@@ -1,5 +1,6 @@
 import os
 import threading
+from typing import Optional
 from core.submodules.search_modules.search_files import search_files_func
 from core.submodules.search_modules.search_by_extension import search_by_extension_func
 from core.submodules.search_modules.search_folders import search_folders_func
@@ -12,11 +13,12 @@ from core.submodules.db_modules.setup_logging import setup_logging_func
 from core.submodules.db_modules.get_connection import get_db_connection_func
 from core.submodules.db_modules.setup_schema import setup_database_schema_func
 from core.submodules.db_modules.close_connection import close_connection_func
+from core.submodules.db_modules.crud_operations import insert_record_func, update_record_func, delete_record_func
 from core.submodules.insert_modules.insert_batch import insert_batch_records_func
-from core.submodules.insert_modules.insert_single import insert_record_func
 from core.submodules.insert_modules.insert_file import insert_file_record_func
 from core.submodules.stats_modules.get_stats import get_stats_func
 from core.submodules.stats_modules.clear_index import clear_index_func
+from core.submodules.scan_modules.background_updater import background_update_func
 
 class FileIndexer:
     def __init__(self, db_path: str = "file_index.db", max_workers: int = os.cpu_count() - 1):
@@ -56,6 +58,15 @@ class FileIndexer:
 
     def insert_file_record(self, filename, full_path, file_size, modified_date):
         insert_file_record_func(self, filename, full_path, file_size, modified_date)
+
+    def update_record(self, full_path: str, file_size: Optional[int], modified_date: Optional[str]):
+        update_record_func(self, full_path, file_size, modified_date)
+
+    def delete_record(self, full_path: str):
+        delete_record_func(self, full_path)
+
+    def start_background_update(self, interval_seconds: int = 3600, stop_event: threading.Event = None):
+        return background_update_func(self, interval_seconds, stop_event)
 
     def search_files(self, search_term: str, exact_match: bool = False):
         return search_files_func(self, search_term, exact_match)
