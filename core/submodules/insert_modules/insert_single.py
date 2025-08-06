@@ -7,7 +7,7 @@ def insert_record_func(indexer, filename: str, full_path: str, parent_path: Opti
     cursor = conn.cursor()
     try:
         cursor.execute('''
-            INSERT OR REPLACE INTO files 
+            INSERT OR IGNORE INTO files 
             (filename, full_path, parent_path, file_size, modified_date, item_type)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (filename, full_path, parent_path, file_size, modified_date, item_type))
