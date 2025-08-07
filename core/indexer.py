@@ -19,6 +19,7 @@ from core.submodules.insert_modules.insert_file import insert_file_record_func
 from core.submodules.stats_modules.get_stats import get_stats_func
 from core.submodules.stats_modules.clear_index import clear_index_func
 from core.submodules.scan_modules.background_updater import background_update_func
+from core.submodules.scan_modules.background_discovery import background_discovery_func
 
 class FileIndexer:
     def __init__(self, db_path: str = "file_index.db", max_workers: int = os.cpu_count() - 1):
@@ -44,8 +45,8 @@ class FileIndexer:
     def scan_network_folder_batch(self, network_path: str, update_existing: bool = False):
         scan_network_folder_batch_func(self, network_path, update_existing)
 
-    def scan_network_folders(self, network_path: str):
-        scan_network_folders_func(self, network_path)
+    def scan_network_folders(self, network_path: str, show_progress: bool = True):
+        scan_network_folders_func(self, network_path, show_progress)
 
     def _process_single_folder(self, folder_name: str, full_path: str):
         return process_single_folder_func(self, folder_name, full_path)
@@ -67,6 +68,9 @@ class FileIndexer:
 
     def start_background_update(self, interval_seconds: int = 3600, stop_event: threading.Event = None):
         return background_update_func(self, interval_seconds, stop_event)
+
+    def start_background_discovery(self, interval_seconds: int = 3600, stop_event: threading.Event = None):
+        return background_discovery_func(self, interval_seconds, stop_event)
 
     def search_files(self, search_term: str, exact_match: bool = False):
         return search_files_func(self, search_term, exact_match)

@@ -13,7 +13,7 @@ from modules.scan_folders import scan_folders_menu
 from modules.search_folder import search_folder_menu
 from modules.display_menu import display_menu
 from utils.shortcut.create_shortcut import create_shortcut
-from config import ENABLE_BACKGROUND_UPDATE # Import the feature flag
+from config import ENABLE_BACKGROUND_UPDATE, ENABLE_BACKGROUND_DISCOVERY
 
 def main_menu():
     print("=== INDEXADOR DE ARQUIVOS DE REDE ===\n")
@@ -35,8 +35,6 @@ def main_menu():
 
     max_workers = os.cpu_count() - 1
     indexer = FileIndexer(max_workers=max_workers)
-
-    # --- Background Update Setup ---
     background_thread = None
     background_stop_event = None
 
@@ -51,6 +49,21 @@ def main_menu():
     else:
         indexer.logger.info("Atualização em segundo plano desabilitada por feature flag.")
     # --- End Background Update Setup ---
+
+    # --- Background Discovery Setup ---
+    discovery_thread = None
+    discovery_stop_event = None
+
+    if ENABLE_BACKGROUND_DISCOVERY:
+        discovery_stop_event = threading.Event()
+        discovery_thread, _ = indexer.start_background_discovery(
+            interval_seconds=3600, # Check every 1 hour (3600 seconds) for new drives
+            stop_event=discovery_stop_event
+        )
+        indexer.logger.info("Processo de descoberta em segundo plano iniciado.")
+    else:
+        indexer.logger.info("Descoberta em segundo plano desabilitada por feature flag.")
+    # --- End Background Discovery Setup ---
 
     running = True
     try:
@@ -82,13 +95,21 @@ def main_menu():
             else:
                 print(f"{RED}Opção inválida. Por favor, escolha uma opção válida.{RESET}")
     finally:
-        # Ensure the background thread is stopped on application exit
+        # Ensure background update thread is stopped on application exit
         if background_stop_event and background_thread and background_thread.is_alive():
             indexer.logger.info("Sinalizando thread de atualização em segundo plano para finalizar...")
             background_stop_event.set()
-            # No need to join here, as the background thread should be daemon and exit with main thread.
-            # If it's not a daemon, joining here would block application exit.
-            # Since it's daemon, it will terminate when the main program exits.
+        
+        # Ensure background discovery thread is stopped on application exit
+        if discovery_stop_event and discovery_thread and discovery_thread.is_alive():
+            indexer.logger.info("Sinalizando thread de descoberta em segundo plano para finalizar...")
+            discovery_stop_event.set()
+
+        # Give daemon threads a moment to clean up, though they should exit with main thread
+        # No explicit join needed for daemon threads unless specific cleanup is critical before main exit.
+        # However, for robustness, a small timeout join can be considered if issues arise.
+        # For now, relying on daemon behavior.
+
         print("Saindo do indexador de arquivos. Fechando conexão com o banco de dados...")
         indexer.close()
 

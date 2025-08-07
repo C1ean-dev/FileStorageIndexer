@@ -4,8 +4,11 @@ from queue import Queue
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
-def scan_network_folders_func(indexer, network_path: str):
-    indexer.logger.info(f"Iniciando escaneamento de pastas em modo streaming: {network_path}")
+def scan_network_folders_func(indexer, network_path: str, show_progress: bool = True):
+    if show_progress:
+        indexer.logger.info(f"Iniciando escaneamento de pastas em modo streaming: {network_path}")
+    else:
+        indexer.logger.debug(f"Iniciando escaneamento de pastas em segundo plano: {network_path}")
 
     if not os.path.exists(network_path):
         indexer.logger.error(f"Caminho não encontrado: {network_path}")
@@ -38,7 +41,7 @@ def scan_network_folders_func(indexer, network_path: str):
 
     with ThreadPoolExecutor(max_workers=indexer.max_workers) as executor:
         futures = []
-        with tqdm(desc="Processando pastas", unit="pasta", dynamic_ncols=True, miniters=1) as pbar:
+        with tqdm(desc="Processando pastas", unit="pasta", dynamic_ncols=True, miniters=1, disable=not show_progress) as pbar:
             while True:
                 item = folder_queue.get()
                 if item is None:
@@ -63,8 +66,11 @@ def scan_network_folders_func(indexer, network_path: str):
     
     collector_thread.join()
 
-    indexer.logger.info(f"Escaneamento de pastas concluído!")
-    indexer.logger.info(f"Pastas processadas: {processed_folders}")
-    indexer.logger.info(f"Erros: {errors}")
-    if processed_folders > 0:
-        indexer.logger.info(f"Taxa de sucesso: {(processed_folders/(processed_folders+errors))*100:.1f}%")
+    if show_progress:
+        indexer.logger.info(f"Escaneamento de pastas concluído!")
+        indexer.logger.info(f"Pastas processadas: {processed_folders}")
+        indexer.logger.info(f"Erros: {errors}")
+        if processed_folders > 0:
+            indexer.logger.info(f"Taxa de sucesso: {(processed_folders/(processed_folders+errors))*100:.1f}%")
+    else:
+        indexer.logger.debug(f"Escaneamento de pastas em segundo plano concluído para {network_path}. Processadas: {processed_folders}, Erros: {errors}")

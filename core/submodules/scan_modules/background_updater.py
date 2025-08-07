@@ -5,6 +5,30 @@ from pathlib import Path
 import sqlite3
 from typing import List
 
+# Max retries for database operations
+MAX_RETRIES = 5
+RETRY_DELAY = 0.1 # seconds
+
+def _execute_read_with_retry(indexer, query, params=(), error_msg="Erro na operação de leitura de banco de dados"):
+    for attempt in range(MAX_RETRIES):
+        conn = indexer.get_db_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(query, params)
+            return cursor.fetchall()
+        except sqlite3.OperationalError as e:
+            if "database is locked" in str(e).lower():
+                indexer.logger.warning(f"{error_msg} (tentativa {attempt + 1}/{MAX_RETRIES}): {e}")
+                time.sleep(RETRY_DELAY * (2 ** attempt)) # Exponential backoff
+            else:
+                indexer.logger.error(f"{error_msg}: {e}")
+                raise
+        except sqlite3.Error as e:
+            indexer.logger.error(f"{error_msg}: {e}")
+            raise
+    indexer.logger.error(f"{error_msg}: Falha após {MAX_RETRIES} tentativas devido a bloqueio do banco de dados.")
+    return [] # Indicate failure after retries
+
 def background_update_func(indexer, interval_seconds: int = 3600, stop_event: threading.Event = None):
     indexer.logger.info(f"Iniciando processo de atualização em segundo plano.")
     
@@ -16,16 +40,10 @@ def background_update_func(indexer, interval_seconds: int = 3600, stop_event: th
             try:
                 # Get all unique parent paths (mapped folders) from the database to monitor
                 mapped_paths = set()
-                conn = indexer.get_db_connection()
-                cursor = conn.cursor()
-                try:
-                    cursor.execute("SELECT DISTINCT full_path FROM files WHERE item_type = 'folder'")
-                    for row in cursor.fetchall():
-                        mapped_paths.add(row[0])
-                except Exception as e:
-                    indexer.logger.error(f"Erro ao recuperar caminhos mapeados para atualização em segundo plano: {e}")
-                finally:
-                    pass # Connection is thread-local, do not close here
+                query = "SELECT DISTINCT full_path FROM files WHERE item_type = 'folder'"
+                results = _execute_read_with_retry(indexer, query, error_msg="Erro ao recuperar caminhos mapeados para atualização em segundo plano")
+                for row in results:
+                    mapped_paths.add(row[0])
 
                 if not mapped_paths:
                     indexer.logger.info("Nenhum caminho mapeado encontrado no banco de dados. Pulando ciclo de atualização.")
@@ -46,9 +64,14 @@ def background_update_func(indexer, interval_seconds: int = 3600, stop_event: th
                         # Step 1: Get current file system state
                         current_fs_items = {}
                         if not os.path.exists(network_path):
-                            indexer.logger.warning(f"Caminho '{network_path}' não encontrado no sistema de arquivos. Pulando atualização.")
-                            # If a mapped path no longer exists, it should be removed from the DB
-                            indexer.delete_record(network_path) 
+                            # Check if it's a top-level drive (e.g., C:/, Y:/)
+                            is_drive_root = len(network_path) == 3 and network_path[1] == ':' and network_path[2] == os.sep
+                            
+                            if is_drive_root:
+                                indexer.logger.info(f"Drive '{network_path}' não encontrado ou acessível. Pulando atualização para este ciclo. Não será removido do índice.")
+                            else:
+                                indexer.logger.info(f"Caminho '{network_path}' não encontrado no sistema de arquivos. Removendo do índice.")
+                                indexer.delete_record(network_path) # Only delete if it's not a drive root
                             continue
 
                         for root, dirs, files in os.walk(network_path):
@@ -76,7 +99,7 @@ def background_update_func(indexer, interval_seconds: int = 3600, stop_event: th
                                         'modified_date': time.ctime(stat.st_mtime)
                                     }
                                 except (OSError, PermissionError) as e:
-                                    indexer.logger.warning(f"Não foi possível obter metadados para {full_path}: {e}")
+                                    indexer.logger.info(f"Não foi possível obter metadados para {full_path}: {e}")
                                     continue
                         
                         if stop_event.is_set():
@@ -84,23 +107,17 @@ def background_update_func(indexer, interval_seconds: int = 3600, stop_event: th
 
                         # Step 2: Get current database state for the given network_path
                         db_items = {}
-                        conn = indexer.get_db_connection()
-                        cursor = conn.cursor()
-                        try:
-                            # Fetch only items that are children of the current network_path
-                            cursor.execute("SELECT full_path, filename, parent_path, file_size, modified_date, item_type FROM files WHERE full_path LIKE ?", (f"{network_path}%",))
-                            for row in cursor.fetchall():
-                                db_items[row[0]] = {
-                                    'filename': row[1],
-                                    'parent_path': row[2],
-                                    'file_size': row[3],
-                                    'modified_date': row[4],
-                                    'item_type': row[5]
-                                }
-                        except sqlite3.Error as e:
-                            indexer.logger.error(f"Erro ao consultar o banco de dados para atualização de {network_path}: {e}")
-                        finally:
-                            pass # Connection is thread-local, do not close here
+                        query = "SELECT full_path, filename, parent_path, file_size, modified_date, item_type FROM files WHERE full_path LIKE ?"
+                        params = (f"{network_path}%",)
+                        results = _execute_read_with_retry(indexer, query, params, error_msg=f"Erro ao consultar o banco de dados para atualização de {network_path}")
+                        for row in results:
+                            db_items[row[0]] = {
+                                'filename': row[1],
+                                'parent_path': row[2],
+                                'file_size': row[3],
+                                'modified_date': row[4],
+                                'item_type': row[5]
+                            }
 
                         # Step 3: Compare and update
                         new_items = 0
