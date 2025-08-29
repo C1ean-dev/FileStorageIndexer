@@ -1,102 +1,222 @@
-# Indexador de Arquivos de Rede
+# 📁 File Indexer - Clean Architecture
 
-Este é um script Python para indexar arquivos em pastas de rede (ou locais) e permitir buscas rápidas por nome ou extensão. Ele utiliza SQLite para armazenar o índice e `ThreadPoolExecutor` para processamento paralelo, otimizando o desempenho em grandes volumes de arquivos.
+Um indexador de arquivos profissional desenvolvido seguindo os princípios da **Clean Architecture**, oferecendo alta performance, testabilidade e manutenibilidade.
 
-## Funcionalidades
+## 🎯 **Visão Geral**
 
-- **Escaneamento de Pastas:** Indexa recursivamente arquivos em um caminho de rede ou local.
-  - **Modo Streaming:** Ideal para pastas muito grandes, com baixo uso de memória.
-  - **Modo Batch:** Exibe uma barra de progresso determinada, melhor para pastas de tamanho médio.
-- **Busca Rápida:**
-  - Busca arquivos por nome (exata ou parcial).
-  - Busca arquivos por extensão (ex: `.pdf`, `.docx`).
-- **Estatísticas:** Exibe o total de arquivos indexados, tamanho total e as extensões de arquivo mais comuns.
-- **Limpeza de Índice:** Permite limpar todos os registros do banco de dados.
-- **Interface Interativa:** Um menu de linha de comando para fácil interação.
-- **Exportação de Resultados:** Opção de salvar resultados de busca por extensão em um arquivo de texto (`.txt`).
+O File Indexer é uma aplicação Python que permite indexar arquivos em pastas de rede, oferecendo funcionalidades de busca rápida e estatísticas detalhadas. A versão atual foi completamente reestruturada seguindo a Clean Architecture para garantir qualidade de código profissional.
 
-## Requisitos
+## 🏗️ **Arquitetura**
 
-- Python 3.x
-- Bibliotecas Python: `sqlite3` (geralmente incluída no Python), `tqdm`, `pathlib`, `argparse`.
+Este projeto implementa **Clean Architecture** com 4 camadas bem definidas:
 
-Você pode instalar as dependências usando `pip`:
+```
+src/
+├── domain/           # 🏛️ Regras de negócio puras
+│   ├── entities/     # FileItem, FolderItem, IndexStats
+│   ├── value_objects/# FilePath, FileSize, SearchCriteria
+│   ├── services/     # FileProcessor, SearchEngine, StatisticsCalculator
+│   ├── enums/        # ScanMode, SearchType
+│   └── exceptions/   # Domain-specific exceptions
+├── application/      # 🎯 Casos de uso e orquestração
+│   ├── use_cases/    # ScanFilesStreaming, SearchFiles, GetStatistics
+│   ├── interfaces/   # Ports (FileRepository, Logger, etc.)
+│   └── dtos/         # ScanRequest, SearchRequest, SearchResult
+├── infrastructure/  # 🏗️ Detalhes técnicos
+│   ├── database/     # SQLite implementation
+│   ├── file_system/  # OS file system access
+│   ├── logging/      # Console/File logging
+│   └── progress/     # TQDM progress reporting
+└── presentation/    # 🖥️ Interface CLI
+    ├── cli/          # Controllers, Views, Formatters
+    └── config/       # Dependency Injection
+```
 
+## 🚀 **Funcionalidades**
+
+### ✅ **Core Features**
+- **🚀 Escaneamento Streaming** - Baixo uso de memória para grandes volumes
+- **🔍 Busca por Nome** - Com suporte a busca exata e parcial
+- **📁 Busca por Extensão** - Filtros por tipo de arquivo
+- **📈 Estatísticas** - Métricas completas do índice
+- **🗑️ Limpeza de Índice** - Remoção segura de dados
+- **📊 Progress Reporting** - Barras de progresso em tempo real
+
+### ✅ **Arquiteturais**
+- **🏛️ Clean Architecture** - 4 camadas bem definidas
+- **🔌 Dependency Injection** - Container IoC completo
+- **📚 Repository Pattern** - Abstração de persistência
+- **🎯 Use Cases** - Casos de uso bem definidos
+- **🔒 Value Objects** - Validação e encapsulamento
+- **📝 Structured Logging** - Sistema de logs profissional
+
+## 📋 **Pré-requisitos**
+
+- **Python 3.8+**
+- **SQLite3** (incluído no Python)
+- **TQDM** (para barras de progresso)
+
+## 🛠️ **Instalação**
+
+### 1. **Clone o repositório**
+```bash
+git clone <repository-url>
+cd file-indexer
+```
+
+### 2. **Instale as dependências**
 ```bash
 pip install -r requirements.txt
 ```
 
-## Como Usar
-
-### Execução Interativa
-
-Execute o script sem argumentos para iniciar o menu interativo:
-
+### 3. **Execute a aplicação**
 ```bash
-python file_indexer.py
+python main.py
 ```
 
-No menu, você poderá escolher entre as seguintes opções:
+## 📖 **Como Usar**
 
-1.  **Escanear pasta de rede (Streaming):** Digite o caminho da pasta para iniciar o escaneamento. Recomendado para grandes volumes de dados.
-2.  **Escanear pasta de rede (Batch):** Digite o caminho da pasta para iniciar o escaneamento. Exibe uma barra de progresso.
-3.  **Buscar arquivo:** Digite o nome do arquivo para buscar.
-4.  **Buscar por extensão:** Digite a extensão (ex: `pdf`, `docx`). Se houver muitos resultados, você poderá listar mais, baixar a lista completa em TXT ou voltar ao menu.
-5.  **Mostrar estatísticas:** Exibe informações sobre o índice.
-6.  **Limpar índice:** Remove todos os arquivos indexados do banco de dados.
-0.  **Sair:** Encerra o programa.
+### **Interface CLI**
+Após executar `python main.py`, você verá o menu principal:
 
-### Execução por Linha de Comando (Argumentos)
+```
+==================================================
+File Indexer - Clean Architecture v2.0.0
+==================================================
+1. 🚀 Escanear pasta (Streaming)
+2. 🔍 Buscar arquivo por nome
+3. 📁 Buscar por extensão
+4. 📈 Mostrar estatísticas
+5. 🗑️ Limpar índice
+6. ❌ Sair
+==================================================
+Escolha uma opção (1-6):
+```
 
-Você também pode usar o script com argumentos de linha de comando para operações específicas:
+### **Exemplos de Uso**
 
--   **Escanear uma pasta:**
-    ```bash
-    python file_indexer.py --scan "\\caminho\da\sua\pasta\de\rede" --streaming
-    # ou para modo batch
-    python file_indexer.py --scan "\\caminho\da\sua\pasta\de\rede" --batch
-    ```
-    (Use `--streaming` para baixo uso de memória ou `--batch` para barra de progresso determinada)
+#### **1. Escanear uma pasta**
+```
+Escolha uma opção (1-6): 1
+Digite o caminho da pasta para escanear: /caminho/para/pasta
+```
 
--   **Buscar um arquivo por nome:**
-    ```bash
-    python file_indexer.py --search "meu_documento"
-    # Para busca exata:
-    python file_indexer.py --search "relatorio_final.pdf" --exact
-    ```
+#### **2. Buscar arquivos**
+```
+Escolha uma opção (1-6): 2
+Digite o nome do arquivo (ou parte dele): documento
+```
 
--   **Buscar arquivos por extensão:**
-    ```bash
-    python file_indexer.py --extension "pdf"
-    ```
+#### **3. Buscar por extensão**
+```
+Escolha uma opção (1-6): 3
+Digite a extensão (ex: .pdf, .txt): .pdf
+```
 
--   **Mostrar estatísticas do índice:**
-    ```bash
-    python file_indexer.py --stats
-    ```
+## 🧪 **Testes**
 
--   **Limpar o índice:**
-    ```bash
-    python file_indexer.py --clear
-    ```
+### **Executar Testes**
+```bash
+# Testes unitários
+python -m pytest tests/unit/
 
--   **Especificar o caminho do banco de dados:**
-    ```bash
-    python file_indexer.py --db "meu_indice.db" --scan "C:\minha_pasta"
-    ```
+# Testes de integração
+python -m pytest tests/integration/
 
--   **Especificar o número de threads (workers):**
-    ```bash
-    python file_indexer.py --workers 4 --scan "C:\minha_pasta"
-    ```
+# Todos os testes
+python -m pytest
+```
 
-## Estrutura do Projeto
+### **Cobertura de Testes**
+```bash
+# Com relatório de cobertura
+python -m pytest --cov=src --cov-report=html
+```
 
--   `file_indexer.py`: O script principal que contém a lógica do indexador e a interface de usuário.
--   `utils\updateRelease\updater.py`: realiza atualizaçoes baseado nas releases do github.
--   `file_index.db`: O arquivo de banco de dados SQLite onde as informações dos arquivos são armazenadas. (criado pelo indexer)
--   `file_indexer.log`: Arquivo de log para registrar operações e erros. (criado pelo indexer)
+## 📚 **Documentação**
 
-## Contribuição
+### **Arquitetura Detalhada**
+- [📖 Documentação da Migração](docs/clean_architecture_migration.md)
+- [🏗️ Diagramas de Arquitetura](docs/architecture/)
+- [🎯 Casos de Uso](docs/use_cases/)
 
-Sinta-se à vontade para contribuir, reportar issues ou sugerir melhorias.
+### **Guias de Desenvolvimento**
+- [🚀 Guia de Contribuição](CONTRIBUTING.md)
+- [📝 Padrões de Código](docs/coding_standards.md)
+- [🔧 Configuração do Ambiente](docs/setup.md)
+
+## 🏛️ **Princípios Aplicados**
+
+### **Clean Architecture**
+- ✅ **Dependency Rule** - Dependências apontam para dentro
+- ✅ **Separation of Concerns** - Responsabilidades bem definidas
+- ✅ **Testability** - Código altamente testável
+- ✅ **Flexibility** - Fácil manutenção e extensão
+
+### **SOLID Principles**
+- ✅ **Single Responsibility** - Uma responsabilidade por classe
+- ✅ **Open/Closed** - Aberto para extensão, fechado para modificação
+- ✅ **Liskov Substitution** - Subtipos substituem supertipos
+- ✅ **Interface Segregation** - Interfaces específicas
+- ✅ **Dependency Inversion** - Dependências de abstrações
+
+## 🔧 **Configuração**
+
+### **Variáveis de Ambiente**
+```bash
+# Database
+DATABASE_PATH=./data/file_indexer.db
+
+# Logging
+LOG_LEVEL=INFO
+LOG_FILE=./logs/file_indexer.log
+
+# Performance
+BATCH_SIZE=1000
+MAX_WORKERS=4
+```
+
+### **Configuração Personalizada**
+Edite `src/presentation/config/dependency_injection.py` para personalizar injeção de dependências.
+
+## 🚀 **Próximos Passos**
+
+### **Curto Prazo**
+- [ ] Interface web com FastAPI (como o gerenciamento de documentos)
+- [ ] Suporte a PostgreSQL (utilizar patterns para que seja possivel flexibilizar o banco talvez utilizando ORM ainda estou analisando)
+- [ ] Cache de estatísticas (adição para o FastAPI, para nao realizar tantas verificaçoes diretamente no banco)
+- [ ] Testes unitários
+
+### **Médio Prazo**
+- [ ] Interface gráfica (tkinker me da mt dor de cabeça mesmo ja utilizando anteriormente)
+- [ ] Busca full-text (já implementado na v1 porem não de maneira eficiente)
+
+### **Longo Prazo**
+- [ ] Machine Learning para sugestões
+- [ ] Integração com cloud storage (armazenamento do banco, talvez o cache tbm)
+
+## 🤝 **Contribuição**
+
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+## 📝 **Licença**
+
+Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+## 📊 **Status do Projeto**
+
+| Componente | Status | Versão |
+|------------|--------|---------|
+| **Domain Layer** | ✅ Completo | 2.0.0 |
+| **Application Layer** | ✅ Completo | 2.0.0 |
+| **Infrastructure Layer** | ✅ Completo | 2.0.0 |
+| **Presentation Layer** | ✅ Completo | 2.0.0 |
+| **Testes** | 🚧 Em desenvolvimento | - |
+| **Documentação** | ✅ Completa | 2.0.0 |
+ 
+**Versão:** 2.0.0 
+**Status:** ✅ **PRODUÇÃO PRONTO**
