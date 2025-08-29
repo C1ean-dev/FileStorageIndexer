@@ -16,7 +16,8 @@ from .handlers import (
     StatisticsHandler,
     ClearIndexHandler,
     ScanFoldersHandler,
-    SearchFoldersHandler
+    SearchFoldersHandler,
+    CheckUpdatesHandler
 )
 
 
@@ -50,6 +51,7 @@ class MenuController:
             "6": ClearIndexHandler(self.container),
             "7": ScanFoldersHandler(self.container),
             "8": SearchFoldersHandler(self.container),
+            "9": CheckUpdatesHandler(self.container),
         }
 
     def display_menu(self) -> None:
@@ -64,6 +66,7 @@ MENU PRINCIPAL:
    6. [CLEAR] Limpar índice
    7. [FOLDERS] Escanear apenas pastas
    8. [FIND] Buscar pasta por nome
+   9. [UPDATE] Verificar atualizações
    0. [EXIT] Sair
         """
         print(menu)

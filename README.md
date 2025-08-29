@@ -1,10 +1,6 @@
-# 📁 File Indexer - Clean Architecture
-
-Um indexador de arquivos profissional desenvolvido seguindo os princípios da **Clean Architecture**, oferecendo alta performance, testabilidade e manutenibilidade.
-
 ## 🎯 **Visão Geral**
 
-O File Indexer é uma aplicação Python que permite indexar arquivos em pastas de rede, oferecendo funcionalidades de busca rápida e estatísticas detalhadas. A versão atual foi completamente reestruturada seguindo a Clean Architecture para garantir qualidade de código profissional.
+O File Indexer é uma aplicação Python que permite indexar arquivos em pastas de rede, oferecendo funcionalidades de busca rápida e estatísticas detalhadas. A versão atual está sendo completamente reestruturada.
 
 ## 🏗️ **Arquitetura**
 
@@ -44,11 +40,9 @@ src/
 
 ### ✅ **Arquiteturais**
 - **🏛️ Clean Architecture** - 4 camadas bem definidas
-- **🔌 Dependency Injection** - Container IoC completo
-- **📚 Repository Pattern** - Abstração de persistência
 - **🎯 Use Cases** - Casos de uso bem definidos
 - **🔒 Value Objects** - Validação e encapsulamento
-- **📝 Structured Logging** - Sistema de logs profissional
+- **📝 Structured Logging** - Sistema de logs
 
 ## 📋 **Pré-requisitos**
 
@@ -133,33 +127,6 @@ python -m pytest
 python -m pytest --cov=src --cov-report=html
 ```
 
-## 📚 **Documentação**
-
-### **Arquitetura Detalhada**
-- [📖 Documentação da Migração](docs/clean_architecture_migration.md)
-- [🏗️ Diagramas de Arquitetura](docs/architecture/)
-- [🎯 Casos de Uso](docs/use_cases/)
-
-### **Guias de Desenvolvimento**
-- [🚀 Guia de Contribuição](CONTRIBUTING.md)
-- [📝 Padrões de Código](docs/coding_standards.md)
-- [🔧 Configuração do Ambiente](docs/setup.md)
-
-## 🏛️ **Princípios Aplicados**
-
-### **Clean Architecture**
-- ✅ **Dependency Rule** - Dependências apontam para dentro
-- ✅ **Separation of Concerns** - Responsabilidades bem definidas
-- ✅ **Testability** - Código altamente testável
-- ✅ **Flexibility** - Fácil manutenção e extensão
-
-### **SOLID Principles**
-- ✅ **Single Responsibility** - Uma responsabilidade por classe
-- ✅ **Open/Closed** - Aberto para extensão, fechado para modificação
-- ✅ **Liskov Substitution** - Subtipos substituem supertipos
-- ✅ **Interface Segregation** - Interfaces específicas
-- ✅ **Dependency Inversion** - Dependências de abstrações
-
 ## 🔧 **Configuração**
 
 ### **Variáveis de Ambiente**
@@ -177,7 +144,7 @@ MAX_WORKERS=4
 ```
 
 ### **Configuração Personalizada**
-Edite `src/presentation/config/dependency_injection.py` para personalizar injeção de dependências.
+O `src/presentation/config/dependency_injection.py` deu uma complicada nas config estou pensando em como unificar ainda 
 
 ## 🚀 **Próximos Passos**
 

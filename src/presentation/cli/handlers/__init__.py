@@ -14,6 +14,7 @@ from .statistics_handler import StatisticsHandler
 from .clear_index_handler import ClearIndexHandler
 from .scan_folders_handler import ScanFoldersHandler
 from .search_folders_handler import SearchFoldersHandler
+from .check_updates_handler import CheckUpdatesHandler
 
 __all__ = [
     'BaseHandler',
@@ -24,5 +25,6 @@ __all__ = [
     'StatisticsHandler',
     'ClearIndexHandler',
     'ScanFoldersHandler',
-    'SearchFoldersHandler'
+    'SearchFoldersHandler',
+    'CheckUpdatesHandler'
 ]

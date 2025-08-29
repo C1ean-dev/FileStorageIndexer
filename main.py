@@ -79,18 +79,14 @@ class FileIndexerApp:
 
 def main():
     """Main entry point."""
-    # Check if running in interactive mode
     if not sys.stdin.isatty():
         print("[ERRO] Este programa foi feito para rodar em modo interativo (CLI).")
         sys.exit(1)
-    
-    # Get database path from environment or use default
+
     db_path = os.environ.get('FILE_INDEXER_DB_PATH', 'file_index.db')
     
-    # Create and run application
     app = FileIndexerApp(db_path=db_path)
     app.run()
-
 
 if __name__ == "__main__":
     main()

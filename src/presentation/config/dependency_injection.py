@@ -18,6 +18,7 @@ from src.application.use_cases.scanning.scan_files_batch import ScanFilesBatchUs
 from src.application.use_cases.scanning.scan_folders_only import ScanFoldersOnlyUseCase
 from src.application.use_cases.searching.search_files import SearchFilesUseCase
 from src.application.use_cases.statistics.get_statistics import GetStatisticsUseCase
+from src.application.use_cases.updates.check_updates import CheckUpdatesUseCase
 
 # Infrastructure Implementations
 from src.infrastructure.file_system.os_file_system import OsFileSystem
@@ -27,6 +28,7 @@ from src.infrastructure.database.repositories.sqlite_file_repository import Sqli
 from src.infrastructure.logging.composite_logger import CompositeLogger
 from src.infrastructure.logging.console_logger import ConsoleLogger
 from src.infrastructure.progress.tqdm_progress_reporter import TqdmProgressReporter
+from src.infrastructure.updates.github_updater import GitHubUpdater
 
 
 class DIContainer:
@@ -94,11 +96,19 @@ class DIContainer:
         
         # Progress Reporter
         self._services['progress_reporter'] = TqdmProgressReporter()
-        
+
+        # Updater
+        self._services['updater'] = GitHubUpdater(
+            repo_owner="C1ean-dev",  # TODO: Configure com o repositório real
+            repo_name="FileStorageIndexer",
+            current_version="41",
+            logger=None  # Will be set after logger is created
+        )
+
         # Logger (composite with console logger)
         console_logger = ConsoleLogger()
         self._services['logger'] = CompositeLogger([console_logger])
-        
+
         # Update logger references
         self._update_logger_references()
     
@@ -149,6 +159,12 @@ class DIContainer:
             statistics_calculator=self._services['statistics_calculator'],
             logger=self._services['logger']
         )
+
+        # Updates Use Cases
+        self._services['check_updates_use_case'] = CheckUpdatesUseCase(
+            updater=self._services['updater'],
+            logger=self._services['logger']
+        )
     
     def _update_logger_references(self) -> None:
         """Update logger references in services that need it."""
@@ -162,6 +178,9 @@ class DIContainer:
         
         # Update file repository logger
         self._services['file_repository'].logger = logger
+
+        # Update updater logger
+        self._services['updater'].logger = logger
     
     def _initialize_database(self) -> None:
         """Initialize the database schema."""
@@ -236,6 +255,10 @@ class DIContainer:
     def get_statistics_use_case(self) -> GetStatisticsUseCase:
         """Get the statistics use case."""
         return self.get('get_statistics_use_case')
+
+    def get_check_updates_use_case(self) -> CheckUpdatesUseCase:
+        """Get the check updates use case."""
+        return self.get('check_updates_use_case')
     
     def shutdown(self) -> None:
         """Shutdown all services and clean up resources."""
