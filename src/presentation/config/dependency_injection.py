@@ -19,6 +19,7 @@ from src.application.use_cases.scanning.scan_folders_only import ScanFoldersOnly
 from src.application.use_cases.searching.search_files import SearchFilesUseCase
 from src.application.use_cases.statistics.get_statistics import GetStatisticsUseCase
 from src.application.use_cases.updates.check_updates import CheckUpdatesUseCase
+from src.application.use_cases.shortcuts.create_shortcut import CreateShortcutUseCase
 
 # Infrastructure Implementations
 from src.infrastructure.file_system.os_file_system import OsFileSystem
@@ -29,6 +30,7 @@ from src.infrastructure.logging.composite_logger import CompositeLogger
 from src.infrastructure.logging.console_logger import ConsoleLogger
 from src.infrastructure.progress.tqdm_progress_reporter import TqdmProgressReporter
 from src.infrastructure.updates.github_updater import GitHubUpdater
+from src.infrastructure.shortcuts.windows_shortcut_creator import WindowsShortcutCreator
 
 
 class DIContainer:
@@ -53,67 +55,60 @@ class DIContainer:
         self._initialized = False
     
     def initialize(self) -> None:
-        """Initialize all services and dependencies."""
+        """Inicia serviços e configuraçoes da aplicação."""
         if self._initialized:
             return
         
-        # Initialize infrastructure layer
         self._configure_infrastructure()
         
-        # Initialize domain services
         self._configure_domain_services()
         
-        # Initialize application layer
         self._configure_application_layer()
         
-        # Initialize database schema
         self._initialize_database()
         
         self._initialized = True
     
     def _configure_infrastructure(self) -> None:
-        """Configure infrastructure layer dependencies."""
-        # File System
+        """Configuraçoes de infra."""
+
         self._services['file_system'] = OsFileSystem()
         
-        # Database Connection Manager
         self._services['connection_manager'] = SqliteConnectionManager(
             db_path=self.db_path,
-            logger=None  # Will be set after logger is created
+            logger=None
         )
         
-        # Schema Manager
         self._services['schema_manager'] = SqliteSchemaManager(
             connection_manager=self._services['connection_manager'],
-            logger=None  # Will be set after logger is created
+            logger=None
         )
         
-        # Repositories
         self._services['file_repository'] = SqliteFileRepository(
             connection_manager=self._services['connection_manager'],
-            logger=None  # Will be set after logger is created
+            logger=None
         )
         
-        # Progress Reporter
         self._services['progress_reporter'] = TqdmProgressReporter()
 
-        # Updater
         self._services['updater'] = GitHubUpdater(
-            repo_owner="C1ean-dev",  # TODO: Configure com o repositório real
+            repo_owner="C1ean-dev",
             repo_name="FileStorageIndexer",
             current_version="41",
-            logger=None  # Will be set after logger is created
+            logger=None
         )
 
-        # Logger (composite with console logger)
+        self._services['shortcut_creator'] = WindowsShortcutCreator(
+            logger=None
+        )
+
         console_logger = ConsoleLogger()
         self._services['logger'] = CompositeLogger([console_logger])
 
-        # Update logger references
         self._update_logger_references()
     
     def _configure_domain_services(self) -> None:
-        """Configure domain layer services."""
+        """Configuraçoes de dominio."""
         self._services['file_processor'] = FileProcessor()
         self._services['search_engine'] = SearchEngine()
         self._services['statistics_calculator'] = StatisticsCalculator()
@@ -145,24 +140,25 @@ class DIContainer:
             progress_reporter=self._services['progress_reporter']
         )
         
-        # Search Use Cases
         self._services['search_files_use_case'] = SearchFilesUseCase(
             file_repository=self._services['file_repository'],
             search_engine=self._services['search_engine'],
             logger=self._services['logger']
         )
         
-        # Statistics Use Cases
         self._services['get_statistics_use_case'] = GetStatisticsUseCase(
             file_repository=self._services['file_repository'],
-            stats_repository=None,  # TODO: Implement stats repository
             statistics_calculator=self._services['statistics_calculator'],
             logger=self._services['logger']
         )
 
-        # Updates Use Cases
         self._services['check_updates_use_case'] = CheckUpdatesUseCase(
             updater=self._services['updater'],
+            logger=self._services['logger']
+        )
+
+        self._services['create_shortcut_use_case'] = CreateShortcutUseCase(
+            shortcut_creator=self._services['shortcut_creator'],
             logger=self._services['logger']
         )
     
@@ -170,17 +166,15 @@ class DIContainer:
         """Update logger references in services that need it."""
         logger = self._services['logger']
         
-        # Update connection manager logger
         self._services['connection_manager'].logger = logger
         
-        # Update schema manager logger
         self._services['schema_manager'].logger = logger
         
-        # Update file repository logger
         self._services['file_repository'].logger = logger
 
-        # Update updater logger
         self._services['updater'].logger = logger
+
+        self._services['shortcut_creator'].logger = logger
     
     def _initialize_database(self) -> None:
         """Initialize the database schema."""
@@ -259,6 +253,10 @@ class DIContainer:
     def get_check_updates_use_case(self) -> CheckUpdatesUseCase:
         """Get the check updates use case."""
         return self.get('check_updates_use_case')
+
+    def get_create_shortcut_use_case(self) -> CreateShortcutUseCase:
+        """Get the create shortcut use case."""
+        return self.get('create_shortcut_use_case')
     
     def shutdown(self) -> None:
         """Shutdown all services and clean up resources."""

@@ -9,7 +9,6 @@ import time
 from src.domain.entities.index_stats import IndexStats
 from src.domain.services.statistics_calculator import StatisticsCalculator
 from src.application.interfaces.repositories.file_repository import FileRepository
-from src.application.interfaces.repositories.stats_repository import StatsRepository
 from src.application.interfaces.services.logger import Logger
 
 
@@ -23,21 +22,18 @@ class GetStatisticsUseCase:
     def __init__(
         self,
         file_repository: FileRepository,
-        stats_repository: StatsRepository,
         statistics_calculator: StatisticsCalculator,
         logger: Logger
     ):
         """
         Initialize the use case.
-        
+
         Args:
             file_repository: Repository for file access
-            stats_repository: Repository for statistics access
             statistics_calculator: Domain service for statistics calculation
             logger: Logger interface
         """
         self.file_repository = file_repository
-        self.stats_repository = stats_repository
         self.statistics_calculator = statistics_calculator
         self.logger = logger
     
@@ -56,18 +52,7 @@ class GetStatisticsUseCase:
         try:
             self.logger.info("Calculando estatísticas do índice...")
             
-            if use_cache:
-                # Try to get cached statistics first
-                try:
-                    cached_stats = self.stats_repository.calculate_comprehensive_stats()
-                    if cached_stats and not cached_stats.is_empty():
-                        execution_time = time.time() - start_time
-                        self.logger.info(f"Estatísticas obtidas do cache em {execution_time*1000:.1f}ms")
-                        return cached_stats
-                except Exception as e:
-                    self.logger.warning(f"Erro ao obter estatísticas do cache: {str(e)}")
-            
-            # Calculate fresh statistics
+            # Calculate fresh statistics (cache not implemented yet)
             all_files = self.file_repository.get_all_files()
             all_folders = self.file_repository.get_all_folders()
             
@@ -149,22 +134,10 @@ class GetStatisticsUseCase:
     def refresh_statistics_cache(self) -> bool:
         """
         Refresh the statistics cache.
-        
+
         Returns:
-            True if cache refresh was successful
+            True if cache refresh was successful (not implemented yet)
         """
-        try:
-            self.logger.info("Atualizando cache de estatísticas...")
-            
-            success = self.stats_repository.refresh_stats_cache()
-            
-            if success:
-                self.logger.info("Cache de estatísticas atualizado com sucesso")
-            else:
-                self.logger.warning("Falha ao atualizar cache de estatísticas")
-            
-            return success
-            
-        except Exception as e:
-            self.logger.error(f"Erro ao atualizar cache de estatísticas: {str(e)}")
-            return False
+        # TODO: Implement cache functionality
+        self.logger.info("Cache de estatísticas não implementado ainda")
+        return False

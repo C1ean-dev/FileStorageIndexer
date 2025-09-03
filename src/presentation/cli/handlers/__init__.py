@@ -15,6 +15,7 @@ from .clear_index_handler import ClearIndexHandler
 from .scan_folders_handler import ScanFoldersHandler
 from .search_folders_handler import SearchFoldersHandler
 from .check_updates_handler import CheckUpdatesHandler
+from .create_shortcut_handler import CreateShortcutHandler
 
 __all__ = [
     'BaseHandler',
@@ -26,5 +27,6 @@ __all__ = [
     'ClearIndexHandler',
     'ScanFoldersHandler',
     'SearchFoldersHandler',
-    'CheckUpdatesHandler'
+    'CheckUpdatesHandler',
+    'CreateShortcutHandler'
 ]

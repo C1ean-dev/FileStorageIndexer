@@ -107,6 +107,150 @@ Escolha uma opção (1-6): 3
 Digite a extensão (ex: .pdf, .txt): .pdf
 ```
 
+## 🔄 **Fluxo de Execução Completo**
+
+### **🎯 Exemplo: Verificação de Atualizações**
+
+Este exemplo mostra como uma única ação do usuário percorre **todas as camadas** da Clean Architecture:
+
+#### **1. Camada de Apresentação (Presentation)**
+```python
+# src/presentation/cli/handlers/check_updates_handler.py
+class CheckUpdatesHandler(BaseHandler):
+    def handle(self):
+        print("Verificando atualizações...")
+
+        # 🏗️ Chama o container DI
+        use_case = self.container.get_check_updates_use_case()
+        result = use_case.execute()
+
+        # 📊 Exibe resultado para usuário
+        self._display_update_results(result)
+```
+
+#### **2. Camada de Aplicação (Application)**
+```python
+# src/application/use_cases/updates/check_updates.py
+class CheckUpdatesUseCase:
+    def __init__(self, updater: Updater, logger: Logger):
+        self.updater = updater  # ← Interface injetada
+        self.logger = logger
+
+    def execute(self):
+        # 🎯 ORQUESTRAÇÃO: Coordena serviços
+        update_info = self.updater.check_for_updates()
+
+        if update_info['update_available']:
+            return {
+                'status': 'update_available',
+                'current_version': update_info['current_version'],
+                'latest_version': update_info['latest_version']
+            }
+```
+
+#### **3. Camada de Domínio (Domain)**
+```python
+# src/application/interfaces/services/updater.py
+class Updater(ABC):
+    @abstractmethod
+    def check_for_updates(self) -> Dict[str, any]:
+        """Contrato: deve verificar atualizações"""
+        pass  # ← Interface abstrata
+```
+
+#### **4. Camada de Infraestrutura (Infrastructure)**
+```python
+# src/infrastructure/updates/github_updater.py
+class GitHubUpdater(Updater):  # ← Implementa interface
+    def check_for_updates(self):
+        # 🏗️ IMPLEMENTAÇÃO REAL
+        response = requests.get(
+            f"https://api.github.com/repos/{self.repo_owner}/{self.repo_name}/releases/latest"
+        )
+
+        if response.status_code == 200:
+            release_data = response.json()
+            latest_version = release_data['tag_name'].lstrip('v')
+
+            return {
+                'update_available': self._is_newer_version(latest_version, self.current_version),
+                'current_version': self.current_version,
+                'latest_version': latest_version,
+                'release_notes': release_data.get('body', ''),
+                'download_url': release_data.get('html_url', '')
+            }
+```
+
+#### **5. Injeção de Dependências (Dependency Injection)**
+```python
+# src/presentation/config/dependency_injection.py
+def _configure_infrastructure(self):
+    # 🏗️ Cria implementação concreta
+    self._services['updater'] = GitHubUpdater(
+        repo_owner="C1ean-dev",
+        repo_name="FileStorageIndexer",
+        current_version="2.0.0"
+    )
+
+def _configure_application_layer(self):
+    # 🎯 Injeta dependências nos use cases
+    self._services['check_updates_use_case'] = CheckUpdatesUseCase(
+        updater=self._services['updater'],  # ← Interface
+        logger=self._services['logger']
+    )
+```
+
+### **📊 Sequência Completa de Execução**
+
+```
+1. 👤 USUÁRIO clica "9. Verificar atualizações"
+   ↓
+2. 🖥️ CLI Handler recebe input
+   ↓
+3. 🏗️ Container DI resolve dependências
+   ↓
+4. 🎯 Use Case orquestra operação
+   ↓
+5. 🏛️ Domain Service define regras
+   ↓
+6. 🏗️ Infrastructure executa operação real
+   ↓
+7. 🌐 GitHub API retorna dados
+   ↓
+8. 🏗️ Infrastructure processa resposta
+   ↓
+9. 🏛️ Domain Service valida dados
+   ↓
+10. 🎯 Use Case formata resultado
+    ↓
+11. 🖥️ CLI Handler exibe resultado
+    ↓
+12. 👤 USUÁRIO vê resultado final
+```
+
+### **🎨 Exemplo Visual do Fluxo**
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   PRESENTATION  │ -> │  APPLICATION    │ -> │    DOMAIN       │
+│   (Handlers)    │    │   (Use Cases)   │    │   (Services)    │
+│                 │    │                 │    │                 │
+│ check_updates_  │    │ CheckUpdates    │    │ Updater         │
+│ handler.py      │    │ UseCase         │    │ (Interface)     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         ↑                       ↑                       ↑
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌─────────────────┐
+                    │ INFRASTRUCTURE  │
+                    │   (Implement)   │
+                    │                 │
+                    │ GitHubUpdater   │
+                    │ (Concrete Impl) │
+                    └─────────────────┘
+```
+
 ## 🧪 **Testes**
 
 ### **Executar Testes**
@@ -127,6 +271,24 @@ python -m pytest
 python -m pytest --cov=src --cov-report=html
 ```
 
+### **Verificação das Camadas**
+```python
+# Teste rápido das dependências
+from src.presentation.config.dependency_injection import get_container
+
+container = get_container()
+print("✅ Container inicializado")
+
+# Teste dos serviços principais
+updater = container.get('updater')
+print(f"✅ Updater: {updater.__class__.__name__}")
+
+use_case = container.get_check_updates_use_case()
+print(f"✅ Use Case: {use_case.__class__.__name__}")
+
+print("🎉 Todas as camadas estão funcionando!")
+```
+
 ## 🔧 **Configuração**
 
 ### **Variáveis de Ambiente**
@@ -143,27 +305,7 @@ BATCH_SIZE=1000
 MAX_WORKERS=4
 ```
 
-### **Configuração Personalizada**
-O `src/presentation/config/dependency_injection.py` deu uma complicada nas config estou pensando em como unificar ainda 
-
-## 🚀 **Próximos Passos**
-
-### **Curto Prazo**
-- [ ] Interface web com FastAPI (como o gerenciamento de documentos)
-- [ ] Suporte a PostgreSQL (utilizar patterns para que seja possivel flexibilizar o banco talvez utilizando ORM ainda estou analisando)
-- [ ] Cache de estatísticas (adição para o FastAPI, para nao realizar tantas verificaçoes diretamente no banco)
-- [ ] Testes unitários
-
-### **Médio Prazo**
-- [ ] Interface gráfica (tkinker me da mt dor de cabeça mesmo ja utilizando anteriormente)
-- [ ] Busca full-text (já implementado na v1 porem não de maneira eficiente)
-
-### **Longo Prazo**
-- [ ] Machine Learning para sugestões
-- [ ] Integração com cloud storage (armazenamento do banco, talvez o cache tbm)
-
 ## 🤝 **Contribuição**
-
 1. Fork o projeto
 2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
 3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)

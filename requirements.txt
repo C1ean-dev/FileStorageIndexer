@@ -1,6 +1,7 @@
 # Requirements para o File Indexer
 tqdm>=4.64.0
 requests
+pywin32>=306  
 
 # Bibliotecas utilizadas (built-in):
 # - os
@@ -14,5 +15,3 @@ requests
 # - queue
 # - concurrent.futures
 
-# Python versão mínima recomendada: 3.6+
-pywin32

@@ -17,7 +17,8 @@ from .handlers import (
     ClearIndexHandler,
     ScanFoldersHandler,
     SearchFoldersHandler,
-    CheckUpdatesHandler
+    CheckUpdatesHandler,
+    CreateShortcutHandler
 )
 
 
@@ -52,6 +53,7 @@ class MenuController:
             "7": ScanFoldersHandler(self.container),
             "8": SearchFoldersHandler(self.container),
             "9": CheckUpdatesHandler(self.container),
+            "10": CreateShortcutHandler(self.container),
         }
 
     def display_menu(self) -> None:
@@ -67,6 +69,7 @@ MENU PRINCIPAL:
    7. [FOLDERS] Escanear apenas pastas
    8. [FIND] Buscar pasta por nome
    9. [UPDATE] Verificar atualizações
+  10. [SHORTCUT] Criar atalho na área de trabalho
    0. [EXIT] Sair
         """
         print(menu)
